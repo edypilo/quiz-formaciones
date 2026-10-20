@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="host">
+  <header class="bar">
+    <img data-logo alt="">
+    <span class="bar-right">
+      <strong data-appname></strong>
+      <button class="sound-btn" id="sound" title="Activar o silenciar el sonido (tecla M)" aria-label="Sonido"></button>
+    </span>
+  </header>
+
+  <!-- 1. Elegir cuestionario -->
+  <section class="view" id="v-setup">
+    <div class="card" style="max-width:640px;margin:40px auto;">
+      <h2>Nueva sesión</h2>
+      <p class="muted">Elige el cuestionario y la red por la que se conectarán los asistentes.</p>
+      <label>Cuestionario<br><select id="quiz" style="width:100%;margin:6px 0 16px"></select></label>
+      <label>Proyecto (logo, colores, portada y financiadores)<br><select id="project" style="width:100%;margin:6px 0 4px"></select></label>
+      <p style="margin:0 0 16px;font-size:14px"><a href="/admin">⚙ Gestionar proyectos</a> · <a href="/editor">✏️ Editor de cuestionarios</a></p>
+      <label>¿Cómo se conectarán los móviles?<br><select id="address" style="width:100%;margin:6px 0 4px"></select></label>
+      <p class="muted" id="address-hint" style="margin:0 0 20px;font-size:14px"></p>
+      <button id="create" style="width:100%">Crear sala</button>
+      <p id="setup-error" class="error hidden"></p>
+      <p id="update" class="update hidden"></p>
+      <p class="muted" id="data-dir" style="font-size:12px;margin:16px 0 0;word-break:break-all"></p>
+    </div>
+  </section>
+
+  <!-- 2. Portada del proyecto -->
+  <section class="view hidden" id="v-cover">
+    <img id="cover" alt="Portada">
+    <button id="cover-next">Mostrar código QR ▶</button>
+  </section>
+
+  <!-- 3. Sala de espera con QR -->
+  <section class="view hidden" id="v-lobby">
+    <div class="lobby">
+      <div class="qr">
+        <img id="qr" alt="Código QR para unirse">
+        <div>PIN de la sala</div>
+        <div class="pin" id="pin"></div>
+        <div class="url" id="join-url"></div>
+      </div>
+      <div>
+        <h1 id="quiz-title"></h1>
+        <p class="muted">Escanea el QR con el móvil para unirte. Recibirás un nombre anónimo.</p>
+        <h2 id="player-count">0 participantes</h2>
+        <div class="players" id="players"></div>
+        <p class="muted" style="font-size:13px">Pulsa sobre un nombre para expulsarlo.</p>
+        <div class="footer-actions">
+          <button class="ghost hidden" id="show-cover">Ver portada</button>
+          <button id="start" disabled>Empezar</button>
+        </div>
+        <p class="muted" style="font-size:13px;text-align:right">Pulsa <strong>F</strong> para pantalla completa.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Pregunta -->
+  <section class="view hidden" id="v-question">
+    <div class="qmeta">
+      <span class="muted"><span id="q-counter"></span> <span class="badge" id="q-badge"></span></span>
+      <span><strong id="answered">0</strong> respuestas</span>
+    </div>
+    <div class="qtext" id="q-text"></div>
+    <div class="qmeta">
+      <div class="timer" id="timer"></div>
+      <div class="qmedia hidden" id="q-media"></div>
+      <div class="explanation hidden" id="explanation"></div>
+      <button class="ghost" id="skip">Saltar ⏭</button>
+    </div>
+    <div class="bars hidden" id="bars"></div>
+    <div class="answers" id="q-answers"></div>
+    <div class="footer-actions hidden" id="reveal-actions"><button id="to-ranking">Clasificación ▶</button></div>
+  </section>
+
+  <!-- 4. Clasificación -->
+  <section class="view hidden" id="v-ranking">
+    <h1 style="text-align:center">Clasificación</h1>
+    <div class="board" id="ranking" role="list"></div>
+    <div class="footer-actions"><button id="next">Siguiente pregunta ▶</button></div>
+  </section>
+
+  <!-- 5. Podio -->
+  <section class="view hidden" id="v-podium">
+    <h1 class="podium-title" id="podium-title"></h1>
+    <div class="stage" id="stage"></div>
+    <div class="footer-actions podium-actions" id="podium-actions">
+      <button class="ghost" id="replay-podium">↻ Repetir</button>
+      <button id="to-stats">Ver diagnóstico ▶</button>
+    </div>
+  </section>
+
+  <!-- 6. Diagnóstico -->
+  <section class="view hidden" id="v-end">
+    <h1 style="text-align:center">Diagnóstico de la sesión</h1>
+    <div class="card">
+      <h3>Diagnóstico por pregunta</h3>
+      <table class="stats" id="stats"></table>
+    </div>
+    <div class="footer-actions">
+      <button class="ghost" id="back-podium">◀ Podio</button>
+      <a id="csv" download><button>Descargar resultados (CSV)</button></a>
+      <button class="ghost" onclick="location.reload()">Nueva sesión</button>
+    </div>
+  </section>
+
+  <footer class="funders hidden" data-funders></footer>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/question-types.js"></script>
+  <script src="/common.js"></script>
+  <script src="/effects.js"></script>
+  <script src="/host.js"></script>
+</body>
+</html>

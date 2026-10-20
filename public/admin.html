@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de proyectos</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body class="admin">
+  <div class="top">
+    <h1>⚙ Gestión de proyectos</h1>
+    <nav class="links"><a href="/editor">✏️ Editor de cuestionarios</a><a href="/host">▶ Crear sala</a></nav>
+  </div>
+
+  <div class="layout">
+    <!-- Lista -->
+    <aside class="panel">
+      <button id="new" style="width:100%;margin-bottom:12px">+ Nuevo proyecto</button>
+      <ul class="plist" id="plist"></ul>
+    </aside>
+
+    <!-- Editor -->
+    <main id="editor">
+      <section class="panel">
+        <h2>Datos del proyecto</h2>
+        <p class="hint">El nombre del proyecto es para identificarlo aquí; el título es lo que verán los asistentes.</p>
+        <div class="grid3">
+          <label class="field">Nombre del proyecto<input type="text" id="f-name" placeholder="Ej.: Digitalización Pymes 2026"></label>
+          <label class="field">Título visible<input type="text" id="f-title" placeholder="Ej.: Quiz de bienvenida"></label>
+          <label class="field">Entidad / organización<input type="text" id="f-org" placeholder="Opcional"></label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Logo del proyecto</h2>
+        <p class="hint">Se muestra en la cabecera (fondo blanco). Mejor PNG con fondo transparente o SVG.</p>
+        <div class="drop" data-slot="logo"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Colores corporativos</h2>
+        <p class="hint">Indica cuántos colores tiene la identidad y su código. Después elige para qué se usa cada uno.</p>
+        <label class="field" style="max-width:220px">Número de colores<input type="number" id="f-ncolors" min="1" max="12"></label>
+        <div id="colors"></div>
+        <div class="grid3" style="margin-top:12px">
+          <label class="field">Color principal<select id="r-primary"></select></label>
+          <label class="field">Color de acento (botones)<select id="r-accent"></select></label>
+          <label class="field">Color de fondo<select id="r-background"></select></label>
+        </div>
+        <div id="contrast-warn" class="warn hidden"></div>
+        <p class="hint" style="margin:6px 0 0">Los cuatro colores de las respuestas (rojo, azul, amarillo, verde) se mantienen para que se distingan bien.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Portada de la sala</h2>
+        <p class="hint">Se proyecta a pantalla completa al abrir la sala, antes del QR. Ideal 1920×1080 (16:9). Si tu portada está en PowerPoint o PDF, expórtala como imagen PNG o JPG.</p>
+        <div class="drop cover" data-slot="cover"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Entidades financiadoras</h2>
+        <p class="hint">Añade el banner oficial o los logos por separado; se muestran en una franja blanca en el orden indicado.</p>
+        <div class="flist" id="funders"></div>
+        <div class="drop" data-slot="funders"></div>
+        <label class="field" style="margin-top:14px">Dónde mostrarlo
+          <select id="f-placement">
+            <option value="lobby">Sala de espera, resultados finales y móviles al unirse</option>
+            <option value="always">Siempre, también durante las preguntas</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="panel savebar">
+        <button id="save">Guardar</button>
+        <button class="secondary" id="duplicate">Duplicar</button>
+        <button class="danger" id="delete">Eliminar</button>
+        <span class="state" id="state"></span>
+      </section>
+    </main>
+
+    <!-- Vista previa -->
+    <aside class="previewcol">
+      <div class="sticky">
+        <div class="panel">
+          <h2>Vista previa</h2>
+          <p class="hint">Así se verá en la pantalla proyectada.</p>
+          <div class="preview" id="preview">
+            <header class="bar"><img data-logo alt=""><strong data-appname></strong></header>
+            <div class="inner">
+              <div class="pq">¿Qué función suma con condición?</div>
+              <div class="answers">
+                <div class="answer c0"><span class="shape">▲</span>SUMA</div>
+                <div class="answer c1"><span class="shape">◆</span>SUMAR.SI</div>
+                <div class="answer c2"><span class="shape">●</span>CONTAR</div>
+                <div class="answer c3"><span class="shape">■</span>PROMEDIO</div>
+              </div>
+              <div class="row">
+                <span class="chip">🦦 Nutria Valiente</span>
+                <button style="padding:8px 14px;font-size:14px;background:var(--secondary);color:var(--on-secondary)">Empezar</button>
+              </div>
+            </div>
+            <footer class="funders hidden" data-funders></footer>
+          </div>
+          <div class="cover-thumb" id="cover-thumb">Sin portada</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="/common.js"></script>
+  <script src="/tools.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>

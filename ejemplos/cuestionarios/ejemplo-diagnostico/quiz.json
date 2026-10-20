@@ -1,0 +1,62 @@
+{
+  "title": "Diagnóstico inicial: Herramientas digitales",
+  "description": "Cuestionario de ejemplo para conocer el punto de partida del grupo.",
+  "project": "por-defecto",
+  "settings": {
+    "defaultTime": 20,
+    "showTextOnDevice": false,
+    "allowLateJoin": true
+  },
+  "questions": [
+    {
+      "type": "poll",
+      "text": "¿Con qué frecuencia usas hojas de cálculo (Excel, Google Sheets) en tu trabajo?",
+      "options": ["Nunca", "Alguna vez al mes", "Varias veces por semana", "A diario"],
+      "correct": [],
+      "time": 15,
+      "points": 0,
+      "explanation": "",
+      "media": null
+    },
+    {
+      "type": "quiz",
+      "text": "¿Qué función de Excel suma solo las celdas que cumplen una condición?",
+      "options": ["SUMA", "SUMAR.SI", "CONTAR", "PROMEDIO"],
+      "correct": [1],
+      "time": 20,
+      "points": 1,
+      "explanation": "SUMAR.SI suma los valores que cumplen un criterio, por ejemplo =SUMAR.SI(A:A;\">100\").",
+      "media": null
+    },
+    {
+      "type": "truefalse",
+      "text": "Un archivo en la nube compartido con «cualquiera con el enlace» es privado.",
+      "options": ["Verdadero", "Falso"],
+      "correct": [1],
+      "time": 10,
+      "points": 1,
+      "explanation": "Cualquier persona que tenga el enlace puede abrirlo, aunque no sea de tu organización.",
+      "media": null
+    },
+    {
+      "type": "quiz",
+      "text": "¿Cuál de estos es un buen ejemplo de contraseña segura?",
+      "options": ["123456", "Empresa2024", "T7#qL!m9$vR2", "MiNombre"],
+      "correct": [2],
+      "time": 20,
+      "points": 2,
+      "explanation": "Combina mayúsculas, minúsculas, números y símbolos, y no contiene palabras ni datos personales.",
+      "media": null
+    },
+    {
+      "type": "quiz",
+      "text": "¿Qué atajo de teclado deshace la última acción en Windows?",
+      "options": ["Ctrl + Z", "Ctrl + Y", "Ctrl + X", "Alt + F4"],
+      "correct": [0],
+      "time": 15,
+      "points": 1,
+      "explanation": "Ctrl + Z deshace; Ctrl + Y rehace lo deshecho.",
+      "media": null
+    }
+  ]
+}

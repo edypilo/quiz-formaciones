@@ -1,0 +1,11 @@
+{
+  "name": "Por defecto",
+  "title": "Quiz de formación",
+  "organization": "Tu organización",
+  "logo": "logo.svg",
+  "cover": null,
+  "funders": [],
+  "fundersPlacement": "lobby",
+  "colors": ["#1F3A93", "#00A8A8", "#0F1B3D"],
+  "roles": { "primary": 0, "accent": 1, "background": 2 }
+}

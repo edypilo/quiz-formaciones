@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0F1B3D">
+  <title>Quiz</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="play">
+  <header class="bar">
+    <img data-logo alt="">
+    <span id="hdr-name"></span>
+  </header>
+
+  <!-- Unirse (si no viene el PIN en el QR) -->
+  <section class="view" id="v-join">
+    <div class="center">
+      <h2 data-appname></h2>
+      <div class="join">
+        <input id="pin" inputmode="numeric" maxlength="6" placeholder="PIN" autocomplete="off">
+        <button id="join">Entrar</button>
+        <p id="join-error" class="error hidden"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Esperando -->
+  <section class="view hidden" id="v-wait">
+    <div class="center">
+      <p class="muted">Tu nombre en esta sesión es</p>
+      <div class="big-emoji" id="emoji"></div>
+      <div class="nick" id="nick"></div>
+      <button class="ghost" id="rename">🎲 Otro nombre</button>
+      <p class="muted" id="wait-msg">Mira la pantalla, la partida empezará enseguida.</p>
+    </div>
+  </section>
+
+  <!-- Responder -->
+  <section class="view hidden" id="v-answer">
+    <p class="muted" id="a-counter" style="margin:0 0 6px"></p>
+    <p id="a-text" class="hidden" style="font-weight:700;margin:0 0 10px"></p>
+    <div class="answers" id="answers"></div>
+  </section>
+
+  <!-- Feedback -->
+  <section class="view hidden" id="v-feedback">
+    <div class="center" id="feedback"></div>
+  </section>
+
+  <footer class="funders hidden" data-funders></footer>
+  <div class="status hidden" id="status"><span id="st-name"></span><span id="st-score">0</span></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/common.js"></script>
+  <script src="/effects.js"></script>
+  <script src="/play.js"></script>
+</body>
+</html>

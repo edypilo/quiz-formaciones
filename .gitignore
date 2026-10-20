@@ -1,0 +1,8 @@
+node_modules/
+.claude/
+# Los datos de cada usuario viven fuera del programa (Documentos/Quiz), nunca en el repositorio.
+projects/
+quizzes/
+datos/
+.DS_Store
+Thumbs.db

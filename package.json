@@ -1,0 +1,33 @@
+{
+  "name": "quiz-formaciones",
+  "version": "1.0.0",
+  "description": "Quiz en vivo tipo Kahoot para formaciones: lo sirves desde tu ordenador y los asistentes juegan con el móvil escaneando un QR.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node iniciar.js"
+  },
+  "author": "Godu4rdo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edypilo/quiz-formaciones.git"
+  },
+  "homepage": "https://github.com/edypilo/quiz-formaciones#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "docx": "^9.13.0",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "jszip": "^3.10.2",
+    "mammoth": "^1.13.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.4"
+  },
+  "optionalDependencies": {
+    "cloudflared": "^0.7.3"
+  },
+  "private": true
+}

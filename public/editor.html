@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editor de cuestionarios</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body class="admin">
+  <div class="top">
+    <h1>✏️ Editor de cuestionarios</h1>
+    <nav class="links"><a href="/admin">⚙ Proyectos</a><a href="/host">▶ Crear sala</a></nav>
+  </div>
+
+  <!-- Lista de cuestionarios -->
+  <section class="view" id="v-list">
+    <div class="panel list-actions">
+      <button id="new">+ Nuevo cuestionario</button>
+      <button class="secondary" id="import-new">⬆ Importar desde Excel o Word</button>
+      <span class="sep"></span>
+      <span class="hint" style="margin:0">Plantillas:</span>
+      <a class="btnlink" href="/api/templates/plantilla-preguntas.xlsx" download>⬇ Excel</a>
+      <a class="btnlink" href="/api/templates/plantilla-preguntas.docx" download>⬇ Word</a>
+    </div>
+    <div class="qcards" id="quiz-list"></div>
+  </section>
+
+  <!-- Edición -->
+  <section class="view hidden" id="v-edit">
+    <div class="panel editbar">
+      <button class="secondary" id="back">← Cuestionarios</button>
+      <input type="text" id="quiz-title" maxlength="120" placeholder="Título del cuestionario" aria-label="Título del cuestionario">
+      <span class="state" id="state"></span>
+      <button class="secondary" id="import-into">⬆ Importar preguntas</button>
+      <a class="btnlink" id="export" download>⬇ Exportar a Excel</a>
+      <button id="save" title="Ctrl + S">Guardar</button>
+    </div>
+
+    <div class="editgrid">
+      <aside class="panel">
+        <ol class="qlist" id="qlist"></ol>
+        <button id="add-q" style="width:100%">+ Añadir pregunta</button>
+      </aside>
+
+      <main class="panel" id="qeditor"></main>
+
+      <aside class="panel settings">
+        <h2>Ajustes del cuestionario</h2>
+        <p class="hint">Se aplican a toda la partida.</p>
+        <label class="field">Descripción<textarea id="s-description" rows="2" maxlength="300" placeholder="Opcional"></textarea></label>
+        <label class="field">Proyecto por defecto<select id="s-project"></select></label>
+        <label class="field">Tiempo por defecto de las preguntas nuevas<select id="s-time"></select></label>
+        <label class="check"><input type="checkbox" id="s-text"> <span>Mostrar también el texto de la pregunta y de las respuestas en los móviles</span></label>
+        <label class="check"><input type="checkbox" id="s-late"> <span>Permitir unirse con la partida ya empezada</span></label>
+        <hr>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="secondary" id="duplicate">Duplicar cuestionario</button>
+          <button class="danger" id="delete">Eliminar</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <input type="file" id="import-file" accept=".xlsx,.docx" hidden>
+  <input type="file" id="media-file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,video/mp4,video/webm" hidden>
+
+  <dialog id="import-dialog">
+    <h2 id="imp-title"></h2>
+    <p id="imp-summary"></p>
+    <div class="warnings hidden" id="imp-warnings"></div>
+    <div class="actions" id="imp-actions"></div>
+  </dialog>
+
+  <script src="/question-types.js"></script>
+  <script src="/common.js"></script>
+  <script src="/tools.js"></script>
+  <script src="/editor.js"></script>
+</body>
+</html>
