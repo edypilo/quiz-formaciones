@@ -351,3 +351,99 @@ test('eliminar un cuestionario restringe el borrado por propietario y detecta in
     });
   }
 });
+
+test('plantillas Word y Excel requieren autenticación y son archivos válidos', async () => {
+  const previous = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  try {
+    await withApi(async (url) => {
+      if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+      throw new Error('No debe consultar PostgREST');
+    }, {}, async (base) => {
+      for (const format of ['xlsx', 'docx']) {
+        const url = base + '/api/cloud/templates/' + format;
+        assert.equal((await fetch(url)).status, 401);
+        const response = await fetch(url, { headers: { Authorization: 'Bearer test.jwt.signature' } });
+        assert.equal(response.status, 200);
+        const data = Buffer.from(await response.arrayBuffer());
+        assert.ok(data.length > 500);
+        assert.equal(data.subarray(0, 2).toString(), 'PK');
+        assert.ok(response.headers.get('content-disposition').includes('plantilla-quizzz.' + format));
+      }
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((k,i) => {
+      if (previous[i] === undefined) delete process.env[k]; else process.env[k] = previous[i];
+    });
+  }
+});
+
+test('importación Excel detecta preguntas pero no modifica datos', async () => {
+  const previous = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const { buildExcel } = require('../import-export');
+  const data = await buildExcel();
+  let calls = 0;
+  try {
+    await withApi(async (url) => {
+      if (String(url).endsWith('/auth/v1/user')) { calls++; return mock({ id: USER }); }
+      throw new Error('Import no debe escribir en la BD');
+    }, {}, async (base) => {
+      const endpoint = base + '/api/cloud/import';
+      const headers = { Authorization: 'Bearer test.jwt.signature', 'Content-Type': 'application/octet-stream' };
+      assert.equal((await fetch(endpoint, { method: 'POST', headers: { ...headers, 'X-Filename': 'test.txt' }, body: data })).status, 400);
+      const result = await fetch(endpoint, { method: 'POST', headers: { ...headers, 'X-Filename': 'prueba.xlsx' }, body: data });
+      assert.equal(result.status, 200);
+      const parsed = await result.json();
+      assert.equal(parsed.questions.length, 4);
+      assert.ok(parsed.questions.some(q => q.type === 'poll'));
+      assert.ok(parsed.questions.every(q => q.media === null));
+      assert.ok(calls >= 2);
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((k,i) => {
+      if (previous[i] === undefined) delete process.env[k]; else process.env[k] = previous[i];
+    });
+  }
+});
+
+test('exportación Word exige propietario del cuestionario', async () => {
+  const previous = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const id = 'ac16f472-f345-469e-8f24-5d978073a79b';
+  let found = false;
+  let readUrl = '';
+  try {
+    await withApi(async (url) => {
+      if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+      readUrl = String(url);
+      return mock(found ? [{
+        id, title: 'Formación IA', description: '', project_id: null,
+        settings: { defaultTime: 20 }, questions: [{
+          type: 'quiz', text: 'Pregunta uno', options: ['A','B'], correct: [0], time: 20, points: 1, explanation: '', media: null,
+        }],
+      }] : []);
+    }, {}, async (base) => {
+      const url = base + '/api/cloud/quizzes/' + id + '/export.docx';
+      assert.equal((await fetch(url)).status, 401);
+      const headers = { Authorization: 'Bearer test.jwt.signature' };
+      assert.equal((await fetch(url, { headers })).status, 404);
+      found = true;
+      const response = await fetch(url, { headers });
+      assert.equal(response.status, 200);
+      const docx = Buffer.from(await response.arrayBuffer());
+      assert.equal(docx.subarray(0, 2).toString(), 'PK');
+      assert.ok(readUrl.includes('owner_id=eq.' + USER));
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((k,i) => {
+      if (previous[i] === undefined) delete process.env[k]; else process.env[k] = previous[i];
+    });
+  }
+});
