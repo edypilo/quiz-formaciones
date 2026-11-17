@@ -96,7 +96,13 @@
         const actions = document.createElement('div');
         actions.className = 'actions';
         actions.style.margin = '0';
-        actions.append(edit, duplicate, remove);
+        const prepare = document.createElement('button');
+        prepare.className = 'minor';
+        prepare.type = 'button';
+        prepare.textContent = 'Preparar sala';
+        prepare.title = 'Genera un PIN privado para esta prueba; todavía no admite jugadores';
+        prepare.addEventListener('click', () => createRoom(record));
+        actions.append(edit, duplicate, remove, prepare);
         li.append(content, actions);
       } else if (kind === 'proyectos') {
         li.classList.add('project-row');
@@ -147,6 +153,8 @@
     login.hidden = false;
     $('project-list').replaceChildren();
     $('quiz-list').replaceChildren();
+    $('room-list').replaceChildren();
+    roomMessage('');
     projectsCache = [];
     ownerId = '';
     quizzesCache = [];
@@ -190,6 +198,7 @@
       renderList('project-list', projectsCache, 'proyectos');
       quizzesCache = safeArray(quizzes);
       renderList('quiz-list', quizzesCache, 'cuestionarios');
+      await refreshRooms();
       message(dashboardStatus, 'Conexión verificada. Consulta de solo lectura.', 'success');
     } catch {
       message(dashboardStatus, 'No se han podido cargar los datos. Comprueba la conexión.', 'error');
@@ -197,6 +206,108 @@
   }
 
 
+
+
+  function roomMessage(text, type = '') {
+    message($('room-status'), text, type);
+  }
+  async function refreshRooms() {
+    if (!(await refreshAccess())) {
+      roomMessage('Vuelve a iniciar sesión.', 'error');
+      return;
+    }
+    try {
+      const response = await fetch('/api/cloud/rooms', {
+        headers: { Authorization: 'Bearer ' + accessToken }, cache: 'no-store',
+      });
+      if (!response.ok) {
+        const body = await json(response);
+        roomMessage(body?.error === 'rooms_unavailable_or_migration_required'
+          ? 'Primero debes ejecutar la migración SQL de salas en Supabase.'
+          : 'No se pudieron consultar las salas.', 'error');
+        return;
+      }
+      const rooms = await json(response);
+      if (!Array.isArray(rooms)) throw new Error('invalid_rooms');
+      const list = $('room-list');
+      list.replaceChildren();
+      if (!rooms.length) {
+        const li = document.createElement('li');
+        li.textContent = 'No hay salas preparadas.';
+        list.append(li);
+      }
+      for (const room of rooms) {
+        const li = document.createElement('li');
+        li.className = 'project-row';
+        const detail = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = quizzesCache.find(q => q.id === room.quiz_id)?.title || 'Cuestionario';
+        const pin = document.createElement('p');
+        pin.style.margin = '6px 0 0';
+        pin.textContent = 'PIN de prueba: ' + room.pin + ' · Caduca: ' +
+          new Date(room.expires_at).toLocaleString('es-ES');
+        detail.append(name, pin);
+        const close = document.createElement('button');
+        close.type = 'button'; close.className = 'minor'; close.textContent = 'Cerrar sala';
+        close.addEventListener('click', () => closeRoom(room));
+        li.append(detail, close);
+        list.append(li);
+      }
+      roomMessage('Listado de salas actualizado.', 'success');
+    } catch {
+      roomMessage('No se pudieron consultar las salas.', 'error');
+    }
+  }
+  $('refresh-rooms').addEventListener('click', () => void refreshRooms());
+
+  async function createRoom(quiz) {
+    if (!(await refreshAccess())) {
+      closeSession(); message(status, 'La sesión ha caducado.', 'error');
+      return;
+    }
+    roomMessage('Preparando sala en Supabase…');
+    try {
+      const response = await fetch('/api/cloud/rooms', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quiz_id: quiz.id }),
+        cache: 'no-store',
+      });
+      const result = await json(response);
+      if (!response.ok) {
+        const errors = {
+          quiz_has_incomplete_questions: 'Este cuestionario tiene preguntas sin completar.',
+          quiz_room_already_open: 'Ya existe una sala abierta para este cuestionario. Ciérrala primero.',
+          rooms_unavailable_or_migration_required: 'Falta ejecutar la migración SQL de salas en Supabase.',
+        };
+        roomMessage(errors[result?.error] || 'No se ha podido preparar la sala.', 'error');
+        return;
+      }
+      await refreshRooms();
+      roomMessage('Sala creada con PIN ' + result.pin +
+        '. Es solo una prueba privada; los jugadores todavía no pueden entrar.', 'success');
+    } catch {
+      roomMessage('Error de conexión al crear la sala.', 'error');
+    }
+  }
+  async function closeRoom(room) {
+    if (!window.confirm('¿Cerrar la sala ' + room.pin + '?')) return;
+    if (!(await refreshAccess())) {
+      closeSession(); message(status, 'La sesión ha caducado.', 'error'); return;
+    }
+    try {
+      const response = await fetch('/api/cloud/rooms/' + encodeURIComponent(room.id) + '/close', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + accessToken },
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('close_room_failed');
+      await refreshRooms();
+      roomMessage('Sala cerrada correctamente.', 'success');
+    } catch {
+      roomMessage('No se pudo cerrar la sala.', 'error');
+    }
+  }
 
   async function quizAction(record, operation) {
     const duplicate = operation === 'duplicate';
