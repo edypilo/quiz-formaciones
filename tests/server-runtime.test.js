@@ -75,6 +75,11 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
     const cloudAdmin = await fetch(`${base}/cloud-admin`);
     assert.equal(cloudAdmin.status, 200);
     assert.match(await cloudAdmin.text(), /Gestiona tus cuestionarios/);
+    const csp = cloudAdmin.headers.get('content-security-policy');
+    assert.match(csp, /img-src 'self' blob:/);
+    assert.match(csp, /media-src 'self' blob:/);
+    assert.doesNotMatch(csp, /img-src[^;]*https:\/\//);
+    assert.doesNotMatch(csp, /media-src[^;]*https:\/\//);
     const adminScript = await fetch(`${base}/cloud-admin.js`);
     assert.equal(adminScript.status, 200);
     assert.ok((await adminScript.text()).includes('grant_type=password'));
