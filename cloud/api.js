@@ -273,6 +273,74 @@ function makeRouter(fetcher = fetch) {
     }
   });
 
+
+  // Operaciones avanzadas con comprobación de propietario en cada consulta.
+  router.post('/quizzes/:id/duplicate', async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_quiz_id' });
+    const { url, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id,
+      owner_id: 'eq.' + userId,
+      select: tables.quizzes.columns,
+      limit: '1',
+    });
+    try {
+      const read = await fetcher(url + '/rest/v1/quiz_quizzes?' + params, {
+        headers: { apikey: req.cloud.key, Authorization: 'Bearer ' + req.cloud.jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const rows = await readJson(read);
+      if (!read.ok || !Array.isArray(rows)) return res.status(502).json({ error: 'database_query_failed' });
+      if (rows.length === 0) return res.status(404).json({ error: 'quiz_not_found' });
+      const original = rows[0];
+      const suffix = ' (copia)';
+      const data = normalizeQuiz({
+        title: String(original.title || '').slice(0, 120 - suffix.length) + suffix,
+        description: original.description,
+        project_id: original.project_id,
+        settings: original.settings,
+        questions: original.questions,
+      });
+      if (!data) return res.status(422).json({ error: 'invalid_quiz_source' });
+      const response = await fetcher(url + '/rest/v1/quiz_quizzes?select=' +
+        encodeURIComponent(tables.quizzes.columns), {
+        method: 'POST',
+        headers: requestHeaders(req.cloud),
+        body: JSON.stringify({ ...data, owner_id: userId }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const result = await readJson(response);
+      if (!response.ok || !Array.isArray(result) || !result[0])
+        return res.status(502).json({ error: 'database_write_failed' });
+      return res.status(201).json(result[0]);
+    } catch {
+      return res.status(502).json({ error: 'database_unavailable' });
+    }
+  });
+
+  router.delete('/quizzes/:id', async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_quiz_id' });
+    const { url, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id,
+      owner_id: 'eq.' + userId,
+      select: 'id',
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_quizzes?' + params, {
+        method: 'DELETE',
+        headers: requestHeaders(req.cloud),
+        signal: AbortSignal.timeout(8000),
+      });
+      const rows = await readJson(response);
+      if (!response.ok || !Array.isArray(rows)) return res.status(502).json({ error: 'database_delete_failed' });
+      if (rows.length === 0) return res.status(404).json({ error: 'quiz_not_found' });
+      return res.json({ deleted: true, id: rows[0].id });
+    } catch {
+      return res.status(502).json({ error: 'database_unavailable' });
+    }
+  });
+
   router.get('/:resource', async (req, res) => {
     const resource = tables[req.params.resource];
     if (!resource) return res.status(404).json({ error: 'not_found' });
