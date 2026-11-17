@@ -107,3 +107,85 @@ test('config publica entrega solo URL y publishable key', async () => {
     if (beforeAnon === undefined) delete process.env.SUPABASE_ANON_KEY; else process.env.SUPABASE_ANON_KEY = beforeAnon;
   }
 });
+
+test('crear proyecto exige token, valida datos e inserta para el usuario autenticado', async () => {
+  const oldUrl = process.env.SUPABASE_URL, oldKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+  const oldAnon = process.env.SUPABASE_ANON_KEY;
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const calls = [];
+  const mockFetch = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (options.method === 'POST') return mock([{ id: 'ac16f472-f345-469e-8f24-5d978073a79b', name: 'Clase de IA' }], 201);
+    throw Error('Unexpected request');
+  };
+  try {
+    await withApi(mockFetch, {}, async (base) => {
+      const payload = { name: 'Clase de IA', title: 'Formación IA', branding: { colors: ['#6989e6', '#efa6a4'] } };
+      const noAuth = await fetch(base + '/api/cloud/projects', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      assert.equal(noAuth.status, 401);
+      const headers = { Authorization: 'Bearer test.jwt.signature', 'Content-Type': 'application/json' };
+      const invalid = await fetch(base + '/api/cloud/projects', {
+        method: 'POST', headers, body: JSON.stringify({ name: '', owner_id: 'anyone' }),
+      });
+      assert.equal(invalid.status, 400);
+      assert.equal(calls.length, 1); // solo auth, ninguna escritura
+      const result = await fetch(base + '/api/cloud/projects', {
+        method: 'POST', headers, body: JSON.stringify({ ...payload, owner_id: 'someone-else' })
+      });
+      assert.equal(result.status, 201);
+      const insertion = calls.find((c) => c.options.method === 'POST');
+      assert.ok(insertion);
+      const body = JSON.parse(insertion.options.body);
+      assert.equal(body.owner_id, USER);
+      assert.equal(body.name, 'Clase de IA');
+      assert.equal(body.branding.roles.primary, 0);
+      assert.equal(insertion.options.headers.Authorization, 'Bearer test.jwt.signature');
+    });
+  } finally {
+    if (oldUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = oldUrl;
+    if (oldKey === undefined) delete process.env.SUPABASE_PUBLISHABLE_KEY; else process.env.SUPABASE_PUBLISHABLE_KEY = oldKey;
+    if (oldAnon === undefined) delete process.env.SUPABASE_ANON_KEY; else process.env.SUPABASE_ANON_KEY = oldAnon;
+  }
+});
+
+test('actualización restringe proyecto por ID y propietario', async () => {
+  const oldUrl = process.env.SUPABASE_URL, oldKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+  const oldAnon = process.env.SUPABASE_ANON_KEY;
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const calls = [];
+  const mockFetch = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (options.method === 'PATCH') return mock([]);
+    throw Error('Unexpected request');
+  };
+  const projectId = 'ac16f472-f345-469e-8f24-5d978073a79b';
+  try {
+    await withApi(mockFetch, {}, async (base) => {
+      const headers = { Authorization: 'Bearer test.jwt.signature', 'Content-Type': 'application/json' };
+      const invalid = await fetch(base + '/api/cloud/projects/bad-id', {
+        method: 'PATCH', headers, body: JSON.stringify({ name: 'Valido' }),
+      });
+      assert.equal(invalid.status, 400);
+      const response = await fetch(base + '/api/cloud/projects/' + projectId, {
+        method: 'PATCH', headers, body: JSON.stringify({ name: 'Actualizado', title: 'Actualizado', organization: '' }),
+      });
+      assert.equal(response.status, 404);
+      const patch = calls.find((c) => c.options.method === 'PATCH');
+      assert.ok(patch.url.includes('owner_id=eq.' + USER));
+      assert.ok(patch.url.includes('id=eq.' + projectId));
+      assert.equal('owner_id' in JSON.parse(patch.options.body), false);
+    });
+  } finally {
+    if (oldUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = oldUrl;
+    if (oldKey === undefined) delete process.env.SUPABASE_PUBLISHABLE_KEY; else process.env.SUPABASE_PUBLISHABLE_KEY = oldKey;
+    if (oldAnon === undefined) delete process.env.SUPABASE_ANON_KEY; else process.env.SUPABASE_ANON_KEY = oldAnon;
+  }
+});
