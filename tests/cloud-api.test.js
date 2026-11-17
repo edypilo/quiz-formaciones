@@ -189,3 +189,85 @@ test('actualización restringe proyecto por ID y propietario', async () => {
     if (oldAnon === undefined) delete process.env.SUPABASE_ANON_KEY; else process.env.SUPABASE_ANON_KEY = oldAnon;
   }
 });
+
+test('cuestionario cloud: crea borrador con tipos compartidos y exige JWT', async () => {
+  const previous = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const calls = [];
+  const fake = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (options.method === 'POST') {
+      const payload = JSON.parse(options.body);
+      return mock([{ id: 'ac16f472-f345-469e-8f24-5d978073a79b', ...payload }], 201);
+    }
+    throw Error('Unexpected fetch');
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const endpoint = base + '/api/cloud/quizzes';
+      const payload = {
+        title: 'Quiz de IA', project_id: null, questions: [
+          { type: 'quiz', text: '¿Qué es IA?', options: ['A', 'B', '', ''], correct: [0], time: 20, points: 1 },
+          { type: 'truefalse', text: '', options: ['Verdadero', 'Falso'], correct: [], time: 10, points: 1 },
+          { type: 'poll', text: 'Opinión', options: ['Sí', 'No'], correct: [0], time: 30, points: 1 },
+        ],
+      };
+      const withoutAuth = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      assert.equal(withoutAuth.status, 401);
+      const headers = { Authorization: 'Bearer test.jwt.signature', 'Content-Type': 'application/json' };
+      const invalid = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ ...payload, questions: [{ type: 'script', text: 'X', options: [], correct: [] }] }) });
+      assert.equal(invalid.status, 400);
+      const noMedia = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ ...payload, questions: [{ type: 'quiz', text: 'X', options: ['A', 'B'], correct: [], media: { type: 'image', src: 'https://bad.site/x' } }] }) });
+      assert.equal(noMedia.status, 400);
+      assert.equal(calls.filter((c) => c.options.method === 'POST').length, 0);
+      const created = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ ...payload, owner_id: 'someone-else' }) });
+      assert.equal(created.status, 201);
+      const body = await created.json();
+      assert.equal(body.owner_id, USER);
+      assert.equal(body.questions[2].points, 0);
+      assert.deepEqual(body.questions[2].correct, []);
+      assert.equal(body.questions[1].options.length, 2);
+      assert.equal(body.questions[1].text, ''); // se permiten borradores
+      const call = calls.find((c) => c.options.method === 'POST');
+      assert.ok(call.url.includes('/rest/v1/quiz_quizzes?'));
+      assert.equal(call.options.headers.Authorization, 'Bearer test.jwt.signature');
+    });
+  } finally {
+    const keys = ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'];
+    keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+  }
+});
+
+test('cuestionario cloud: edición exige propietario y devuelve 404 si no existe', async () => {
+  const previous = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const calls = [];
+  const fake = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    return mock([]);
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const id = 'ac16f472-f345-469e-8f24-5d978073a79b';
+      const headers = { Authorization: 'Bearer test.jwt.signature', 'Content-Type': 'application/json' };
+      const payload = { title: 'Actualizado', project_id: null, questions: [] };
+      const bad = await fetch(base + '/api/cloud/quizzes/bad-id', { method: 'PATCH', headers, body: JSON.stringify(payload) });
+      assert.equal(bad.status, 400);
+      const updated = await fetch(base + '/api/cloud/quizzes/' + id, { method: 'PATCH', headers, body: JSON.stringify(payload) });
+      assert.equal(updated.status, 404);
+      const patch = calls.find((c) => c.options.method === 'PATCH');
+      assert.ok(patch.url.includes('owner_id=eq.' + USER));
+      assert.ok(patch.url.includes('id=eq.' + id));
+      assert.equal(Object.hasOwn(JSON.parse(patch.options.body), 'owner_id'), false);
+    });
+  } finally {
+    const keys = ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'];
+    keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+  }
+});
