@@ -45,6 +45,8 @@ const io = new Server(server);
 // Despliegue seguro por defecto: hasta tener autenticación, BD y Redis,
 // el modo nube solo responde a health-check. La versión local no cambia.
 if (IS_CLOUD) {
+  // API cloud protegida. El resto de la app permanece deshabilitada hasta migrar salas y editor.
+  app.use('/api/cloud', require('./cloud/api').makeRouter());
   io.use((_socket, next) => next(new Error('cloud_setup_required')));
   app.use((req, res, next) => {
     if (req.path === '/api/health') return next();
