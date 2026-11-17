@@ -279,18 +279,21 @@ function wordQuestionTable(rec, n) {
   ];
 }
 
-async function buildWord() {
+async function buildWord(quiz = null) {
   const empty = Object.fromEntries(FIELDS.map((f) => [f.key, '']));
   const blank = [{ ...empty, type: 'Quiz', time: 20, points: 'Estándar' }, { ...empty, type: 'Quiz', time: 20, points: 'Estándar' }];
+  const records = quiz ? quiz.questions.map(questionToRecord) : [...EXAMPLES, ...blank];
   const doc = new Document({
     styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },
     sections: [{
       children: [
-        new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun('Plantilla de preguntas')] }),
-        new Paragraph({ children: [new TextRun({ text: 'Cómo rellenarla', bold: true, color: '1F3A93' })] }),
-        ...INSTRUCTIONS.map((t) => new Paragraph({ bullet: { level: 0 }, children: [new TextRun(t.replace('Cada fila (en Excel) o cada tabla (en Word)', 'Cada tabla'))] })),
-        new Paragraph({ children: [new TextRun({ text: 'Para añadir preguntas, copia y pega una de las tablas. No cambies los textos de la columna izquierda.', italics: true })] }),
-        ...[...EXAMPLES, ...blank].flatMap((rec, i) => wordQuestionTable(rec, i + 1)),
+        new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(quiz ? quiz.title : 'Plantilla de preguntas')] }),
+        ...(quiz ? [] : [
+          new Paragraph({ children: [new TextRun({ text: 'Cómo rellenarla', bold: true, color: '1F3A93' })] }),
+          ...INSTRUCTIONS.map((t) => new Paragraph({ bullet: { level: 0 }, children: [new TextRun(t.replace('Cada fila (en Excel) o cada tabla (en Word)', 'Cada tabla'))] })),
+          new Paragraph({ children: [new TextRun({ text: 'Para añadir preguntas, copia y pega una de las tablas. No cambies los textos de la columna izquierda.', italics: true })] }),
+        ]),
+        ...records.flatMap((rec, i) => wordQuestionTable(rec, i + 1)),
       ],
     }],
   });
