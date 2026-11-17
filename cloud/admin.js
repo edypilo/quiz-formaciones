@@ -405,7 +405,7 @@
     $('question-media-youtube-form').hidden = true;
     $('question-media-remove').hidden = !q?.media;
     message($('question-media-status'),
-      'PNG, JPG, WEBP, GIF (máx. 10 MB) o MP4/WEBM (máx. 50 MB). Sin SVG.');
+      'PNG, JPG, WEBP, GIF, MP4 o WEBM (máx. 6 MB). Sin SVG.');
     if (!q?.media) return;
     if (q.media.type === 'youtube') {
       const id = youtubeIdFromUrl(q.media.src);
@@ -456,7 +456,8 @@
     $('question-media-file').value = '';
     if (!file || !quizDraft || mediaUploading) return;
     const ext = allowedMedia[file.type];
-    const limit = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    // Para cargas estándar se limita a 6 MB. Vídeos grandes usarán TUS reanudable.
+    const limit = 6 * 1024 * 1024;
     if (!ext || !file.size || file.size > limit) {
       message($('question-media-status'), 'Formato no admitido o archivo demasiado grande.', 'error');
       return;
