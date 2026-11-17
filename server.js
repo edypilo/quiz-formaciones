@@ -45,6 +45,8 @@ const io = new Server(server);
 // Despliegue seguro por defecto: hasta tener autenticación, BD y Redis,
 // el modo nube solo responde a health-check. La versión local no cambia.
 if (IS_CLOUD) {
+  // Comprobación de despliegue sin exponer la aplicación mientras se migra.
+  app.get('/', require('./cloud/landing').cloudLanding);
   // API cloud protegida. El resto de la app permanece deshabilitada hasta migrar salas y editor.
   app.use('/api/cloud', require('./cloud/api').makeRouter());
   io.use((_socket, next) => next(new Error('cloud_setup_required')));
@@ -543,4 +545,5 @@ if (require.main === module && !IS_CLOUD) startLocalServer();
 
 // Export HTTP.Server para que Vercel pueda usar Express y los upgrades WebSocket.
 module.exports = server;
+module.exports.app = app;
 module.exports.startLocalServer = startLocalServer;
