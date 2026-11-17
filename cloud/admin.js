@@ -74,7 +74,21 @@
         edit.type = 'button';
         edit.textContent = 'Editar';
         edit.addEventListener('click', () => openQuizEditor(record));
-        li.append(content, edit);
+        const duplicate = document.createElement('button');
+        duplicate.className = 'minor';
+        duplicate.type = 'button';
+        duplicate.textContent = 'Duplicar';
+        duplicate.addEventListener('click', () => quizAction(record, 'duplicate'));
+        const remove = document.createElement('button');
+        remove.className = 'minor';
+        remove.type = 'button';
+        remove.textContent = 'Eliminar';
+        remove.addEventListener('click', () => quizAction(record, 'delete'));
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+        actions.style.margin = '0';
+        actions.append(edit, duplicate, remove);
+        li.append(content, actions);
       } else if (kind === 'proyectos') {
         li.classList.add('project-row');
         const edit = document.createElement('button');
@@ -172,6 +186,44 @@
   }
 
 
+
+  async function quizAction(record, operation) {
+    const duplicate = operation === 'duplicate';
+    const confirmation = duplicate
+      ? '¿Crear una copia de «' + record.title + '»?'
+      : '¿Eliminar «' + record.title + '»? No se puede deshacer.';
+    if (!window.confirm(confirmation)) return;
+    if (!(await refreshAccess())) {
+      closeSession();
+      message(status, 'La sesión ha caducado. Vuelve a entrar.', 'error');
+      return;
+    }
+    const target = '/api/cloud/quizzes/' + encodeURIComponent(record.id) + (duplicate ? '/duplicate' : '');
+    try {
+      message(dashboardStatus, duplicate ? 'Duplicando cuestionario…' : 'Eliminando cuestionario…');
+      const response = await fetch(target, {
+        method: duplicate ? 'POST' : 'DELETE',
+        headers: { Authorization: 'Bearer ' + accessToken },
+        cache: 'no-store',
+      });
+      if (response.status === 401) {
+        closeSession();
+        message(status, 'La sesión ha caducado. Vuelve a entrar.', 'error');
+        return;
+      }
+      if (!response.ok) {
+        message(dashboardStatus, 'No se pudo completar la operación.', 'error');
+        return;
+      }
+      if (!duplicate && quizDraft?.id === record.id) closeQuizEditor(true);
+      await loadData();
+      message(dashboardStatus,
+        duplicate ? 'Copia guardada correctamente.' : 'Cuestionario eliminado.', 'success');
+    } catch {
+      message(dashboardStatus, 'No se pudo conectar con el servidor.', 'error');
+    }
+  }
+
   function blankQuestion(type = 'quiz') {
     return {
       type, text: '',
@@ -206,7 +258,29 @@
         renderQuestionNav();
         renderQuestionEditor();
       });
-      list.append(button);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'question-nav-row';
+      wrapper.append(button);
+      for (const [direction, label] of [[-1, 'Subir'], [1, 'Bajar']]) {
+        const nextIndex = i + direction;
+        const move = document.createElement('button');
+        move.type = 'button';
+        move.className = 'minor';
+        move.textContent = direction < 0 ? '↑' : '↓';
+        move.title = label + ' pregunta';
+        move.setAttribute('aria-label', label + ' pregunta ' + (i + 1));
+        move.disabled = nextIndex < 0 || nextIndex >= quizDraft.questions.length;
+        move.addEventListener('click', () => {
+          const qs = quizDraft.questions;
+          [qs[i], qs[nextIndex]] = [qs[nextIndex], qs[i]];
+          if (quizSelection === i) quizSelection = nextIndex;
+          else if (quizSelection === nextIndex) quizSelection = i;
+          markQuizDirty();
+          renderQuestionNav(); renderQuestionEditor();
+        });
+        wrapper.append(move);
+      }
+      list.append(wrapper);
     });
   }
   function renderQuestionEditor() {
