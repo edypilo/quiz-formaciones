@@ -501,3 +501,105 @@ test('multimedia cloud: acepta rutas de usuario y YouTube; rechaza rutas ajenas 
     });
   }
 });
+
+test('salas privadas: sin JWT no se pueden listar ni crear', async () => {
+  const before = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  try {
+    await withApi(async () => { throw Error('No debe conectar sin JWT'); }, {}, async (base) => {
+      assert.equal((await fetch(base + '/api/cloud/rooms')).status, 401);
+      assert.equal((await fetch(base + '/api/cloud/rooms', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quiz_id: 'ac16f472-f345-469e-8f24-5d978073a79b' }),
+      })).status, 401);
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((key,i) => {
+      if (before[i] === undefined) delete process.env[key]; else process.env[key] = before[i];
+    });
+  }
+});
+
+test('anfitrión: crea sala con PIN 6 cifras y sólo para su cuestionario completo', async () => {
+  const before = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const quizId = 'ac16f472-f345-469e-8f24-5d978073a79b';
+  const roomId = 'd5f47ca1-a416-43a3-8341-6dffca530f3f';
+  const calls = [];
+  const fake = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (String(url).includes('/rest/v1/quiz_quizzes?')) return mock([{
+      id: quizId, title: 'Curso',
+      questions: [{ type: 'quiz', text: '¿Pregunta?', options: ['Sí','No'], correct: [0], time: 20, points: 1 }],
+    }]);
+    if (options.method === 'PATCH') return mock(null, 204);
+    if (options.method === 'POST') {
+      const data = JSON.parse(options.body);
+      return mock([{ ...data, id: roomId, expires_at: new Date(Date.now() + 3600000).toISOString() }], 201);
+    }
+    throw Error('Llamada inesperada');
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const headers = { Authorization: 'Bearer test.jwt.signature', 'Content-Type': 'application/json' };
+      const bad = await fetch(base + '/api/cloud/rooms', {
+        method: 'POST', headers, body: JSON.stringify({ quiz_id: 'no' }),
+      });
+      assert.equal(bad.status, 400);
+      const response = await fetch(base + '/api/cloud/rooms', {
+        method: 'POST', headers, body: JSON.stringify({ quiz_id: quizId, owner_id: 'other' }),
+      });
+      assert.equal(response.status, 201);
+      const room = await response.json();
+      assert.match(room.pin, /^[0-9]{6}$/);
+      const check = calls.find(c => c.url.includes('/quiz_quizzes?'));
+      assert.ok(check.url.includes('owner_id=eq.' + USER));
+      const write = calls.find(c => c.options.method === 'POST');
+      assert.equal(JSON.parse(write.options.body).owner_id, USER);
+      assert.equal(JSON.parse(write.options.body).status, 'waiting');
+      assert.equal(write.options.headers.Authorization, 'Bearer test.jwt.signature');
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((key,i) => {
+      if (before[i] === undefined) delete process.env[key]; else process.env[key] = before[i];
+    });
+  }
+});
+
+test('cierre de salas filtra por propietario y no permite modificar otras columnas', async () => {
+  const before = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const roomId = 'd5f47ca1-a416-43a3-8341-6dffca530f3f';
+  let patchUrl = '';
+  let data;
+  const fake = async (url, options) => {
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (options.method === 'PATCH') {
+      patchUrl = String(url); data = JSON.parse(options.body);
+      return mock([{ id: roomId, pin: '987654', status: 'closed' }]);
+    }
+    throw Error('Llamada inesperada');
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const headers = { Authorization: 'Bearer test.jwt.signature' };
+      assert.equal((await fetch(base + '/api/cloud/rooms/not-valid/close', { method: 'POST', headers })).status, 400);
+      const response = await fetch(base + '/api/cloud/rooms/' + roomId + '/close', { method: 'POST', headers });
+      assert.equal(response.status, 200);
+      assert.deepEqual(data, { status: 'closed' });
+      assert.ok(patchUrl.includes('owner_id=eq.' + USER));
+      assert.ok(patchUrl.includes('status=eq.waiting'));
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((key,i) => {
+      if (before[i] === undefined) delete process.env[key]; else process.env[key] = before[i];
+    });
+  }
+});
