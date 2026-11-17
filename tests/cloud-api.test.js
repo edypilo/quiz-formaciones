@@ -537,7 +537,7 @@ test('anfitrión: crea sala con PIN 6 cifras y sólo para su cuestionario comple
       id: quizId, title: 'Curso',
       questions: [{ type: 'quiz', text: '¿Pregunta?', options: ['Sí','No'], correct: [0], time: 20, points: 1 }],
     }]);
-    if (options.method === 'PATCH') return mock(null, 204);
+    if (options.method === 'PATCH') return new Response(null, { status: 204 });
     if (options.method === 'POST') {
       const data = JSON.parse(options.body);
       return mock([{ ...data, id: roomId, expires_at: new Date(Date.now() + 3600000).toISOString() }], 201);
