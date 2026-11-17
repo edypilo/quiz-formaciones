@@ -379,7 +379,21 @@
   $('quiz-import-replace').addEventListener('click', () => applyImportedQuestions(true));
 
 
+  function closeMediaLightbox() {
+    const dialog = $('media-lightbox');
+    if (dialog.open) dialog.close();
+    $('media-lightbox-image').removeAttribute('src');
+  }
+  $('media-lightbox-close').addEventListener('click', closeMediaLightbox);
+  $('media-lightbox').addEventListener('click', (event) => {
+    if (event.target === $('media-lightbox')) closeMediaLightbox();
+  });
+  $('media-lightbox').addEventListener('close', () => {
+    $('media-lightbox-image').removeAttribute('src');
+  });
+
   function clearMediaPreview() {
+    closeMediaLightbox();
     mediaPreviewVersion++;
     if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
     mediaPreviewUrl = '';
@@ -439,9 +453,23 @@
       const el = document.createElement(q.media.type === 'video' ? 'video' : 'img');
       el.src = url;
       if (q.media.type === 'video') {
-        el.controls = true; el.preload = 'metadata';
-      } else el.alt = 'Vista previa de la pregunta';
-      $('question-media-preview').append(el);
+        el.controls = true;
+        el.preload = 'metadata';
+        $('question-media-preview').append(el);
+      } else {
+        el.alt = 'Vista previa de la pregunta';
+        const zoom = document.createElement('button');
+        zoom.type = 'button';
+        zoom.className = 'media-zoom';
+        zoom.setAttribute('aria-label', 'Ampliar imagen de la pregunta');
+        zoom.title = 'Pulsa para ampliar la imagen';
+        zoom.addEventListener('click', () => {
+          $('media-lightbox-image').src = url;
+          $('media-lightbox').showModal();
+        });
+        zoom.append(el);
+        $('question-media-preview').append(zoom);
+      }
     } catch {
       if (token === mediaPreviewVersion)
         message($('question-media-status'), 'No se ha podido cargar el archivo privado.', 'error');
