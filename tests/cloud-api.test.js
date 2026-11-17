@@ -447,3 +447,57 @@ test('exportación Word exige propietario del cuestionario', async () => {
     });
   }
 });
+
+test('multimedia cloud: acepta rutas de usuario y YouTube; rechaza rutas ajenas y dominios falsos', async () => {
+  const previous = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const mediaPath = USER + '/assets/ac16f472-f345-469e-8f24-5d978073a79b.png';
+  const quiz = {
+    title: 'Multimedia',
+    project_id: null,
+    questions: [
+      { type: 'quiz', text: 'Con imagen', options: ['Sí','No'], correct: [0], media: { type: 'image', src: mediaPath } },
+      { type: 'poll', text: 'Con vídeo', options: ['Sí','No'], correct: [], media: { type: 'youtube', src: 'https://youtu.be/abcdefghijk' } },
+    ],
+  };
+  let inserts = 0;
+  const fake = async (url, options) => {
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (options.method === 'POST') {
+      inserts++;
+      return mock([{ id: 'ac16f472-f345-469e-8f24-5d978073a79b', ...JSON.parse(options.body) }], 201);
+    }
+    throw Error('Unexpected call');
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const endpoint = base + '/api/cloud/quizzes';
+      const headers = { Authorization: 'Bearer test.jwt.signature', 'Content-Type': 'application/json' };
+      const post = (payload) => fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) });
+      const r = await post(quiz);
+      assert.equal(r.status, 201);
+      const saved = await r.json();
+      assert.deepEqual(saved.questions[0].media, { type: 'image', src: mediaPath });
+      assert.deepEqual(saved.questions[1].media, { type: 'youtube', src: 'https://www.youtube.com/watch?v=abcdefghijk' });
+      assert.equal((await post({ ...quiz, questions: [{
+        ...quiz.questions[0], media: { type: 'image', src: '1570d6d0-6b12-48ca-a565-4a08a7dcb171/assets/ac16f472-f345-469e-8f24-5d978073a79b.png' },
+      }] })).status, 400);
+      assert.equal((await post({ ...quiz, questions: [{
+        ...quiz.questions[0], media: { type: 'youtube', src: 'https://youtube.com.evil.example/watch?v=abcdefghijk' },
+      }] })).status, 400);
+      assert.equal((await post({ ...quiz, questions: [{
+        ...quiz.questions[0], media: { type: 'image', src: 'https://external.example/test.png' },
+      }] })).status, 400);
+      assert.equal((await post({ ...quiz, questions: [{
+        ...quiz.questions[0], media: { type: 'image', src: USER + '/assets/ac16f472-f345-469e-8f24-5d978073a79b.svg' },
+      }] })).status, 400);
+      assert.equal(inserts, 1);
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((k,i) => {
+      if (previous[i] === undefined) delete process.env[k]; else process.env[k] = previous[i];
+    });
+  }
+});
