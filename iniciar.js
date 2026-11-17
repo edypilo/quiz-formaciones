@@ -38,4 +38,4 @@ function openBrowser(url) {
 }
 
 process.once('quiz:ready', (port) => openBrowser(`http://localhost:${port}/host`));
-require('./server');
+require('./server').startLocalServer();
