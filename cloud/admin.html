@@ -146,6 +146,12 @@
         </form>
         <p id="project-status" class="status" role="status" aria-live="polite"></p>
       </div>
+      <section id="rooms-section" class="list-card" aria-label="Salas de prueba del formador" style="margin-bottom:24px">
+        <div class="actions"><h3 style="margin:0;flex:1">Salas preparadas</h3><button id="refresh-rooms" type="button" class="minor">Actualizar salas</button></div>
+        <p class="hint">Fase de prueba: el PIN se genera y se guarda, pero todavía no admite la entrada de participantes. No lo compartas todavía.</p>
+        <ul id="room-list" class="items"><li>Preparando listado…</li></ul>
+        <p id="room-status" class="status" role="status" aria-live="polite"></p>
+      </section>
       <div class="columns">
         <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Proyectos</h3><button id="new-project" type="button">+ Nuevo proyecto</button></div><ul class="items" id="project-list"></ul></article>
         <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Cuestionarios</h3><button id="new-quiz" type="button">+ Nuevo cuestionario</button></div>
@@ -155,6 +161,6 @@
       </div>
       <p id="dashboard-status" class="status" role="status" aria-live="polite"></p>
     </section>
-    <p class="footer">Versión de prueba: gestión de proyectos y borradores de cuestionarios. Por seguridad, la sesión se mantiene en memoria y se cierra al actualizar la página. El acceso a la aplicación sigue protegido por Vercel Authentication.</p>
+    <p class="footer">Las salas son todavía privadas y solo permiten preparar y cerrar una sesión. No existe una pantalla de participantes ni juego online en esta versión. Versión de prueba: gestión de proyectos y borradores de cuestionarios. Por seguridad, la sesión se mantiene en memoria y se cierra al actualizar la página. El acceso a la aplicación sigue protegido por Vercel Authentication.</p>
   </main>
 </body></html>
