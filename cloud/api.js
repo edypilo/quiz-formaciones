@@ -33,6 +33,39 @@ async function readJson(response) {
   try { return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
+function normalizeProject(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  if (typeof input.name !== 'string' || !input.name.trim() || input.name.trim().length > 80) return null;
+  const name = input.name.trim();
+  const title = input.title === undefined || input.title === '' ? name : input.title;
+  if (typeof title !== 'string' || !title.trim() || title.trim().length > 80) return null;
+  const organization = input.organization === undefined ? '' : input.organization;
+  if (typeof organization !== 'string' || organization.trim().length > 80) return null;
+
+  // Se admiten colores y roles pero no HTML, imágenes ni URLs arbitrarias.
+  const branding = input.branding === undefined ? {} : input.branding;
+  if (!branding || typeof branding !== 'object' || Array.isArray(branding)) return null;
+  const colors = branding.colors === undefined ? ['#6989E6', '#EFA6A4'] : branding.colors;
+  if (!Array.isArray(colors) || colors.length < 1 || colors.length > 12 ||
+      !colors.every((color) => typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color))) return null;
+  const roles = branding.roles === undefined ? {} : branding.roles;
+  if (!roles || typeof roles !== 'object' || Array.isArray(roles)) return null;
+  const primary = roles.primary === undefined ? 0 : roles.primary;
+  const accent = roles.accent === undefined ? Math.min(1, colors.length - 1) : roles.accent;
+  const background = roles.background === undefined ? 'auto' : roles.background;
+  const validIndex = (index) => Number.isInteger(index) && index >= 0 && index < colors.length;
+  if (!validIndex(primary) || !validIndex(accent) ||
+      !(background === 'auto' || validIndex(background))) return null;
+  return {
+    name, title: title.trim(), organization: organization.trim(),
+    branding: {
+      colors,
+      roles: { primary, accent, background },
+      fundersPlacement: branding.fundersPlacement === 'always' ? 'always' : 'lobby',
+    },
+  };
+}
+
 function makeRouter(fetcher = fetch) {
   const router = express.Router();
   // Únicamente datos públicos del proyecto: nunca devolver claves de servicio.
@@ -66,6 +99,64 @@ function makeRouter(fetcher = fetch) {
   });
 
   router.get('/me', (req, res) => res.json({ id: req.cloud.userId }));
+
+  const jsonProject = express.json({ limit: '16kb' });
+  function requestHeaders(cloud) {
+    return {
+      apikey: cloud.key,
+      Authorization: 'Bearer ' + cloud.jwt,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    };
+  }
+
+  router.post('/projects', jsonProject, async (req, res) => {
+    const data = normalizeProject(req.body);
+    if (!data) return res.status(400).json({ error: 'invalid_project' });
+    const { url, userId } = req.cloud;
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_projects?select=' +
+        encodeURIComponent(tables.projects.columns), {
+        method: 'POST',
+        headers: requestHeaders(req.cloud),
+        body: JSON.stringify({ ...data, owner_id: userId }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const body = await readJson(response);
+      if (!response.ok || !Array.isArray(body) || !body[0])
+        return res.status(502).json({ error: 'database_write_failed' });
+      return res.status(201).json(body[0]);
+    } catch {
+      return res.status(502).json({ error: 'database_unavailable' });
+    }
+  });
+
+  router.patch('/projects/:id', jsonProject, async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_project_id' });
+    const data = normalizeProject(req.body);
+    if (!data) return res.status(400).json({ error: 'invalid_project' });
+    const { url, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id,
+      owner_id: 'eq.' + userId,
+      select: tables.projects.columns,
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_projects?' + params, {
+        method: 'PATCH',
+        headers: requestHeaders(req.cloud),
+        body: JSON.stringify(data),
+        signal: AbortSignal.timeout(8000),
+      });
+      const body = await readJson(response);
+      if (!response.ok || !Array.isArray(body))
+        return res.status(502).json({ error: 'database_write_failed' });
+      if (body.length === 0) return res.status(404).json({ error: 'project_not_found' });
+      return res.json(body[0]);
+    } catch {
+      return res.status(502).json({ error: 'database_unavailable' });
+    }
+  });
 
   router.get('/:resource', async (req, res) => {
     const resource = tables[req.params.resource];
