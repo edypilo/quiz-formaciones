@@ -83,3 +83,27 @@ test('Supabase rechaza JWT: no se realizan consultas a tablas', async () => {
     if (oldKey === undefined) delete process.env.SUPABASE_ANON_KEY; else process.env.SUPABASE_ANON_KEY = oldKey;
   }
 });
+
+test('config publica entrega solo URL y publishable key', async () => {
+  const beforeUrl = process.env.SUPABASE_URL;
+  const beforePublish = process.env.SUPABASE_PUBLISHABLE_KEY;
+  const beforeAnon = process.env.SUPABASE_ANON_KEY;
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  try {
+    await withApi(() => { throw new Error('No debe llamar a Supabase'); }, {}, async (base) => {
+      const response = await fetch(base + '/api/cloud/config');
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(await response.json(), {
+        supabaseUrl: 'https://example.supabase.co',
+        publishableKey: 'sb_publishable_test',
+      });
+    });
+  } finally {
+    if (beforeUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = beforeUrl;
+    if (beforePublish === undefined) delete process.env.SUPABASE_PUBLISHABLE_KEY; else process.env.SUPABASE_PUBLISHABLE_KEY = beforePublish;
+    if (beforeAnon === undefined) delete process.env.SUPABASE_ANON_KEY; else process.env.SUPABASE_ANON_KEY = beforeAnon;
+  }
+});
