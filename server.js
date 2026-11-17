@@ -47,6 +47,19 @@ const io = new Server(server);
 if (IS_CLOUD) {
   // Comprobación de despliegue sin exponer la aplicación mientras se migra.
   app.get('/', require('./cloud/landing').cloudLanding);
+  const sendCloudFile = (name, type) => (_req, res) => {
+    res.set({
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Robots-Tag': 'noindex, nofollow',
+      'Content-Security-Policy': type === 'html'
+        ? "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self' https://*.supabase.co; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'"
+        : "default-src 'none'",
+    });
+    return res.type(type).sendFile(path.join(__dirname, 'cloud', name));
+  };
+  app.get('/cloud-admin', sendCloudFile('admin.html', 'html'));
+  app.get('/cloud-admin.js', sendCloudFile('admin.js', 'js'));
   // API cloud protegida. El resto de la app permanece deshabilitada hasta migrar salas y editor.
   app.use('/api/cloud', require('./cloud/api').makeRouter());
   io.use((_socket, next) => next(new Error('cloud_setup_required')));
