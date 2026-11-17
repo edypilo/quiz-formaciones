@@ -68,7 +68,19 @@
         <button id="sign-out" type="button" class="minor">Cerrar sesión</button></div>
       <div id="quiz-editor" class="card project-form" hidden>
         <div class="actions"><h3 id="quiz-editor-heading" style="margin:0;flex:1">Nuevo cuestionario</h3><button class="minor" type="button" id="quiz-cancel">Cerrar editor</button></div>
-        <p class="hint">Guarda borradores aunque haya preguntas incompletas. Imágenes, importación y partidas estarán disponibles en próximas fases.</p>
+        <p class="hint">Guarda borradores aunque haya preguntas incompletas. Las imágenes y las partidas estarán disponibles en próximas fases.</p>
+        <div class="actions"><button type="button" id="quiz-import" class="minor">Importar Excel / Word</button>
+          <button type="button" id="quiz-export-xlsx" class="minor">Exportar Excel</button>
+          <button type="button" id="quiz-export-docx" class="minor">Exportar Word</button></div>
+        <input id="quiz-import-file" type="file" accept=".xlsx,.docx" hidden>
+        <section id="quiz-import-preview" class="list-card" hidden aria-label="Vista previa de importación">
+          <h3>Vista previa de importación</h3>
+          <p id="quiz-import-summary" class="hint"></p>
+          <div id="quiz-import-warnings" class="hint"></div>
+          <div class="actions"><button type="button" id="quiz-import-append">Añadir preguntas</button>
+            <button type="button" id="quiz-import-replace" class="minor">Sustituir preguntas</button>
+            <button type="button" id="quiz-import-cancel" class="minor">Cancelar</button></div>
+        </section>
         <form id="quiz-form">
           <div class="fields">
             <div><label for="quiz-title">Título del cuestionario</label><input id="quiz-title" maxlength="120" required></div>
@@ -119,7 +131,10 @@
       </div>
       <div class="columns">
         <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Proyectos</h3><button id="new-project" type="button">+ Nuevo proyecto</button></div><ul class="items" id="project-list"></ul></article>
-        <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Cuestionarios</h3><button id="new-quiz" type="button">+ Nuevo cuestionario</button></div><ul class="items" id="quiz-list"></ul></article>
+        <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Cuestionarios</h3><button id="new-quiz" type="button">+ Nuevo cuestionario</button></div>
+          <div class="actions"><button type="button" id="quiz-template-xlsx" class="minor">Plantilla Excel</button>
+            <button type="button" id="quiz-template-docx" class="minor">Plantilla Word</button></div>
+          <ul class="items" id="quiz-list"></ul></article>
       </div>
       <p id="dashboard-status" class="status" role="status" aria-live="polite"></p>
     </section>
