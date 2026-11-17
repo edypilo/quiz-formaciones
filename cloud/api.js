@@ -341,6 +341,106 @@ function makeRouter(fetcher = fetch) {
     }
   });
 
+
+  // Plantillas y exportaciones reutilizan la lógica de la edición de escritorio.
+  // Las importaciones son vistas previas: no escriben en la base de datos.
+  const importExport = require('../import-export');
+  const maxImportSize = 5 * 1024 * 1024;
+  const rawImport = express.raw({ type: 'application/octet-stream', limit: maxImportSize });
+
+  router.get('/templates/:format', async (req, res) => {
+    if (!['xlsx', 'docx'].includes(req.params.format))
+      return res.status(404).json({ error: 'unsupported_format' });
+    try {
+      const format = req.params.format;
+      const buffer = format === 'xlsx'
+        ? await importExport.buildExcel()
+        : await importExport.buildWord();
+      res.set({
+        'Cache-Control': 'no-store',
+        'Content-Type': format === 'xlsx'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': 'attachment; filename="plantilla-quizzz.' + format + '"',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return res.status(200).send(buffer);
+    } catch {
+      return res.status(500).json({ error: 'template_generation_failed' });
+    }
+  });
+
+  router.post('/import', rawImport, async (req, res) => {
+    const filename = req.header('X-Filename') || '';
+    const name = String(filename).trim();
+    if (!/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ._()\-]{1,120}\.(xlsx|docx)$/i.test(name))
+      return res.status(400).json({ error: 'invalid_filename' });
+    if (!Buffer.isBuffer(req.body) || !req.body.length)
+      return res.status(400).json({ error: 'invalid_file' });
+    try {
+      const result = await importExport.parseFile(name, req.body);
+      if (!Array.isArray(result.questions) || !Array.isArray(result.warnings))
+        return res.status(422).json({ error: 'invalid_import' });
+      if (result.questions.length > 200)
+        return res.status(422).json({ error: 'too_many_questions' });
+      const warnings = result.warnings.slice(0, 300);
+      // Multimedia se incorporará mediante Storage; avisar siempre y pedir
+      // confirmación al usuario antes de importar preguntas con enlaces.
+      const questions = result.questions.map((question, index) => {
+        if (question.media) {
+          warnings.push('Pregunta ' + (index + 1) + ': el enlace multimedia no se importa en esta versión.');
+          return { ...question, media: null };
+        }
+        return question;
+      });
+      return res.json({ questions, warnings });
+    } catch (error) {
+      return res.status(422).json({ error: 'import_parse_failed', message: String(error.message || '').slice(0, 200) });
+    }
+  });
+
+  router.get('/quizzes/:id/export.:format', async (req, res) => {
+    const format = req.params.format;
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_quiz_id' });
+    if (!['xlsx', 'docx'].includes(format)) return res.status(404).json({ error: 'unsupported_format' });
+    const { url, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id,
+      owner_id: 'eq.' + userId,
+      select: tables.quizzes.columns,
+      limit: '1',
+    });
+    let record;
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_quizzes?' + params, {
+        headers: { apikey: req.cloud.key, Authorization: 'Bearer ' + req.cloud.jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const data = await readJson(response);
+      if (!response.ok || !Array.isArray(data)) return res.status(502).json({ error: 'database_query_failed' });
+      if (!data.length) return res.status(404).json({ error: 'quiz_not_found' });
+      record = data[0];
+    } catch {
+      return res.status(502).json({ error: 'database_unavailable' });
+    }
+    try {
+      const buffer = format === 'xlsx'
+        ? await importExport.buildExcel(record)
+        : await importExport.buildWord(record);
+      res.set({
+        'Cache-Control': 'no-store',
+        'Content-Type': format === 'xlsx'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': 'attachment; filename="cuestionario-quizzz.' + format + '"',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return res.status(200).send(buffer);
+    } catch {
+      return res.status(500).json({ error: 'export_generation_failed' });
+    }
+  });
+
   router.get('/:resource', async (req, res) => {
     const resource = tables[req.params.resource];
     if (!resource) return res.status(404).json({ error: 'not_found' });
