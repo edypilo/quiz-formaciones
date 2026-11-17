@@ -67,10 +67,47 @@ function normalizeProject(input) {
 }
 
 
+// Los objetos multimedia se almacenan en el bucket PRIVADO quiz-media.
+// La referencia persistida es solo una ruta propia, nunca una URL firmada.
+const storageAsset = /^([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/assets\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(png|jpg|webp|gif|mp4|webm)$/i;
+const imageExtensions = new Set(['png', 'jpg', 'webp', 'gif']);
+const videoExtensions = new Set(['mp4', 'webm']);
+
+function validYoutubeId(source) {
+  if (typeof source !== 'string' || source.length > 400) return null;
+  try {
+    const url = new URL(source);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
+    const hostname = url.hostname.toLowerCase();
+    if (!['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtube-nocookie.com'].includes(hostname)) return null;
+    let id = null;
+    if (hostname === 'youtu.be') id = url.pathname.slice(1);
+    else if (url.pathname === '/watch') id = url.searchParams.get('v');
+    else if (/^\/(shorts|embed|live)\/[a-zA-Z0-9_-]{11}$/.test(url.pathname)) id = url.pathname.split('/')[2];
+    return /^[a-zA-Z0-9_-]{11}$/.test(id || '') ? id : null;
+  } catch { return null; }
+}
+
+function normalizeCloudMedia(media, ownerId) {
+  if (media === undefined || media === null) return null;
+  if (!media || typeof media !== 'object' || Array.isArray(media) || typeof media.src !== 'string') return undefined;
+  if (media.type === 'youtube') {
+    const id = validYoutubeId(media.src);
+    return id ? { type: 'youtube', src: 'https://www.youtube.com/watch?v=' + id } : undefined;
+  }
+  if (!uuid.test(ownerId || '')) return undefined;
+  const match = storageAsset.exec(media.src);
+  if (!match || match[1].toLowerCase() !== ownerId.toLowerCase()) return undefined;
+  const ext = match[3].toLowerCase();
+  if (media.type === 'image' && imageExtensions.has(ext)) return { type: 'image', src: media.src };
+  if (media.type === 'video' && videoExtensions.has(ext)) return { type: 'video', src: media.src };
+  return undefined;
+}
+
 // Comparte la validación de tipos con el editor local. Se admiten borradores
 // incompletos, pero nunca formatos desconocidos ni multimedia sin migrar.
 const { getType, normalizeQuestion } = require('../public/question-types');
-function normalizeQuiz(input) {
+function normalizeQuiz(input, ownerId) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   if (typeof input.title !== 'string' || input.title.trim().length < 1 || input.title.trim().length > 120) return null;
   const description = input.description === undefined ? '' : input.description;
@@ -94,7 +131,8 @@ function normalizeQuiz(input) {
     if (!original || typeof original !== 'object' || Array.isArray(original)) return null;
     const type = getType(original.type);
     if (!type || !type.available) return null;
-    if (original.media !== undefined && original.media !== null) return null;
+    const media = normalizeCloudMedia(original.media, ownerId);
+    if (media === undefined) return null;
     if (typeof original.text !== 'string' || original.text.length > 250) return null;
     if (!Array.isArray(original.options) || original.options.length > 4 ||
       !original.options.every((option) => typeof option === 'string' && option.length <= 120)) return null;
@@ -105,7 +143,7 @@ function normalizeQuiz(input) {
     if (original.time !== undefined &&
       (!Number.isInteger(Number(original.time)) || Number(original.time) < 5 || Number(original.time) > 240)) return null;
     if (original.points !== undefined && ![0, 1, 2].includes(Number(original.points))) return null;
-    questions.push(normalizeQuestion(original, settings.defaultTime).question);
+    questions.push(normalizeQuestion({ ...original, media }, settings.defaultTime).question);
   }
   return { title: input.title.trim(), description: description.trim(), project_id: projectId, settings, questions };
 }
@@ -204,7 +242,7 @@ function makeRouter(fetcher = fetch) {
 
   const jsonQuiz = express.json({ limit: '512kb' });
   router.post('/quizzes', jsonQuiz, async (req, res) => {
-    const data = normalizeQuiz(req.body);
+    const data = normalizeQuiz(req.body, req.cloud.userId);
     if (!data) return res.status(400).json({ error: 'invalid_quiz' });
     const { url, userId } = req.cloud;
     try {
@@ -249,7 +287,7 @@ function makeRouter(fetcher = fetch) {
 
   router.patch('/quizzes/:id', jsonQuiz, async (req, res) => {
     if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_quiz_id' });
-    const data = normalizeQuiz(req.body);
+    const data = normalizeQuiz(req.body, req.cloud.userId);
     if (!data) return res.status(400).json({ error: 'invalid_quiz' });
     const { url, userId } = req.cloud;
     const params = new URLSearchParams({
@@ -300,7 +338,7 @@ function makeRouter(fetcher = fetch) {
         project_id: original.project_id,
         settings: original.settings,
         questions: original.questions,
-      });
+      }, userId);
       if (!data) return res.status(422).json({ error: 'invalid_quiz_source' });
       const response = await fetcher(url + '/rest/v1/quiz_quizzes?select=' +
         encodeURIComponent(tables.quizzes.columns), {
