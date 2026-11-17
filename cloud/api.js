@@ -422,11 +422,15 @@ function makeRouter(fetcher = fetch) {
       if (result.questions.length > 200)
         return res.status(422).json({ error: 'too_many_questions' });
       const warnings = result.warnings.slice(0, 300);
-      // Multimedia se incorporará mediante Storage; avisar siempre y pedir
-      // confirmación al usuario antes de importar preguntas con enlaces.
+      // Enlaces de YouTube válidos se conservan; las imágenes externas no se
+      // incorporan automáticamente a un bucket privado.
       const questions = result.questions.map((question, index) => {
+        if (question.media?.type === 'youtube') {
+          const id = validYoutubeId(question.media.src);
+          if (id) return { ...question, media: { type: 'youtube', src: 'https://www.youtube.com/watch?v=' + id } };
+        }
         if (question.media) {
-          warnings.push('Pregunta ' + (index + 1) + ': el enlace multimedia no se importa en esta versión.');
+          warnings.push('Pregunta ' + (index + 1) + ': la imagen o el enlace externo debe subirse manualmente.');
           return { ...question, media: null };
         }
         return question;
