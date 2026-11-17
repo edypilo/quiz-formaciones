@@ -66,6 +66,49 @@ function normalizeProject(input) {
   };
 }
 
+
+// Comparte la validación de tipos con el editor local. Se admiten borradores
+// incompletos, pero nunca formatos desconocidos ni multimedia sin migrar.
+const { getType, normalizeQuestion } = require('../public/question-types');
+function normalizeQuiz(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  if (typeof input.title !== 'string' || input.title.trim().length < 1 || input.title.trim().length > 120) return null;
+  const description = input.description === undefined ? '' : input.description;
+  if (typeof description !== 'string' || description.length > 300) return null;
+  const projectId = input.project_id === undefined || input.project_id === '' ? null : input.project_id;
+  if (projectId !== null && (typeof projectId !== 'string' || !uuid.test(projectId))) return null;
+  const rawSettings = input.settings === undefined ? {} : input.settings;
+  if (!rawSettings || typeof rawSettings !== 'object' || Array.isArray(rawSettings)) return null;
+  const defaultTime = rawSettings.defaultTime === undefined ? 20 : Number(rawSettings.defaultTime);
+  if (!Number.isInteger(defaultTime) || defaultTime < 5 || defaultTime > 240) return null;
+  if (rawSettings.showTextOnDevice !== undefined && typeof rawSettings.showTextOnDevice !== 'boolean') return null;
+  if (rawSettings.allowLateJoin !== undefined && typeof rawSettings.allowLateJoin !== 'boolean') return null;
+  const settings = {
+    defaultTime,
+    showTextOnDevice: rawSettings.showTextOnDevice === true,
+    allowLateJoin: rawSettings.allowLateJoin !== false,
+  };
+  if (!Array.isArray(input.questions) || input.questions.length > 200) return null;
+  const questions = [];
+  for (const original of input.questions) {
+    if (!original || typeof original !== 'object' || Array.isArray(original)) return null;
+    const type = getType(original.type);
+    if (!type || !type.available) return null;
+    if (original.media !== undefined && original.media !== null) return null;
+    if (typeof original.text !== 'string' || original.text.length > 250) return null;
+    if (!Array.isArray(original.options) || original.options.length > 4 ||
+      !original.options.every((option) => typeof option === 'string' && option.length <= 120)) return null;
+    if (!Array.isArray(original.correct) || original.correct.length > 4 ||
+      !original.correct.every((index) => Number.isInteger(index) && index >= 0 && index <= 3)) return null;
+    if (original.explanation !== undefined &&
+      (typeof original.explanation !== 'string' || original.explanation.length > 400)) return null;
+    if (original.time !== undefined &&
+      (!Number.isInteger(Number(original.time)) || Number(original.time) < 5 || Number(original.time) > 240)) return null;
+    if (original.points !== undefined && ![0, 1, 2].includes(Number(original.points))) return null;
+    questions.push(normalizeQuestion(original, settings.defaultTime).question);
+  }
+  return { title: input.title.trim(), description: description.trim(), project_id: projectId, settings, questions };
+}
 function makeRouter(fetcher = fetch) {
   const router = express.Router();
   // Únicamente datos públicos del proyecto: nunca devolver claves de servicio.
@@ -153,6 +196,78 @@ function makeRouter(fetcher = fetch) {
         return res.status(502).json({ error: 'database_write_failed' });
       if (body.length === 0) return res.status(404).json({ error: 'project_not_found' });
       return res.json(body[0]);
+    } catch {
+      return res.status(502).json({ error: 'database_unavailable' });
+    }
+  });
+
+
+  const jsonQuiz = express.json({ limit: '512kb' });
+  router.post('/quizzes', jsonQuiz, async (req, res) => {
+    const data = normalizeQuiz(req.body);
+    if (!data) return res.status(400).json({ error: 'invalid_quiz' });
+    const { url, userId } = req.cloud;
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_quizzes?select=' +
+        encodeURIComponent(tables.quizzes.columns), {
+        method: 'POST',
+        headers: requestHeaders(req.cloud),
+        body: JSON.stringify({ ...data, owner_id: userId }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const result = await readJson(response);
+      if (!response.ok || !Array.isArray(result) || !result[0])
+        return res.status(502).json({ error: 'database_write_failed' });
+      return res.status(201).json(result[0]);
+    } catch {
+      return res.status(502).json({ error: 'database_unavailable' });
+    }
+  });
+
+  router.get('/quizzes/:id', async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_quiz_id' });
+    const { url, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id,
+      owner_id: 'eq.' + userId,
+      select: tables.quizzes.columns,
+      limit: '1',
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_quizzes?' + params, {
+        headers: { apikey: req.cloud.key, Authorization: 'Bearer ' + req.cloud.jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const records = await readJson(response);
+      if (!response.ok || !Array.isArray(records)) return res.status(502).json({ error: 'database_query_failed' });
+      if (!records.length) return res.status(404).json({ error: 'quiz_not_found' });
+      return res.json(records[0]);
+    } catch {
+      return res.status(502).json({ error: 'database_unavailable' });
+    }
+  });
+
+  router.patch('/quizzes/:id', jsonQuiz, async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_quiz_id' });
+    const data = normalizeQuiz(req.body);
+    if (!data) return res.status(400).json({ error: 'invalid_quiz' });
+    const { url, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id,
+      owner_id: 'eq.' + userId,
+      select: tables.quizzes.columns,
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_quizzes?' + params, {
+        method: 'PATCH',
+        headers: requestHeaders(req.cloud),
+        body: JSON.stringify(data),
+        signal: AbortSignal.timeout(8000),
+      });
+      const records = await readJson(response);
+      if (!response.ok || !Array.isArray(records)) return res.status(502).json({ error: 'database_write_failed' });
+      if (!records.length) return res.status(404).json({ error: 'quiz_not_found' });
+      return res.json(records[0]);
     } catch {
       return res.status(502).json({ error: 'database_unavailable' });
     }
