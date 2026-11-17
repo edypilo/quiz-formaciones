@@ -20,6 +20,15 @@
   let quizDraft = null;
   let quizSelection = 0;
   let quizDirty = false;
+  let ownerId = '';
+  let mediaPreviewUrl = '';
+  let mediaPreviewVersion = 0;
+  let mediaUploading = false;
+  const allowedMedia = Object.freeze({
+    'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif',
+    'video/mp4': 'mp4', 'video/webm': 'webm',
+  });
+
 
 
   function message(el, text, type = '') {
@@ -139,6 +148,7 @@
     $('project-list').replaceChildren();
     $('quiz-list').replaceChildren();
     projectsCache = [];
+    ownerId = '';
     quizzesCache = [];
     closeProjectEditor();
     closeQuizEditor(true);
@@ -175,6 +185,7 @@
       }
       const [identity, projects, quizzes] = await Promise.all(responses.map(json));
       if (!identity?.id || !Array.isArray(projects) || !Array.isArray(quizzes)) throw new Error('invalid_data');
+      ownerId = identity.id;
       projectsCache = safeArray(projects);
       renderList('project-list', projectsCache, 'proyectos');
       quizzesCache = safeArray(quizzes);
@@ -367,6 +378,149 @@
   $('quiz-import-append').addEventListener('click', () => applyImportedQuestions(false));
   $('quiz-import-replace').addEventListener('click', () => applyImportedQuestions(true));
 
+
+  function clearMediaPreview() {
+    mediaPreviewVersion++;
+    if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+    mediaPreviewUrl = '';
+    $('question-media-preview').replaceChildren();
+  }
+  function youtubeIdFromUrl(source) {
+    try {
+      const u = new URL(source);
+      if (u.protocol !== 'https:' || u.username || u.password || u.port) return null;
+      const host = u.hostname.toLowerCase();
+      if (!['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtube-nocookie.com'].includes(host)) return null;
+      let id = null;
+      if (host === 'youtu.be') id = u.pathname.slice(1);
+      else if (u.pathname === '/watch') id = u.searchParams.get('v');
+      else if (/^\/(shorts|embed|live)\/[A-Za-z0-9_-]{11}$/.test(u.pathname)) id = u.pathname.split('/')[2];
+      return /^[A-Za-z0-9_-]{11}$/.test(id || '') ? id : null;
+    } catch { return null; }
+  }
+  async function renderMediaPreview() {
+    const q = quizDraft?.questions[quizSelection];
+    clearMediaPreview();
+    const token = mediaPreviewVersion;
+    $('question-media-youtube-form').hidden = true;
+    $('question-media-remove').hidden = !q?.media;
+    message($('question-media-status'),
+      'PNG, JPG, WEBP, GIF (máx. 10 MB) o MP4/WEBM (máx. 50 MB). Sin SVG.');
+    if (!q?.media) return;
+    if (q.media.type === 'youtube') {
+      const id = youtubeIdFromUrl(q.media.src);
+      if (!id) {
+        message($('question-media-status'), 'El enlace de YouTube no es válido.', 'error');
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = 'https://www.youtube.com/watch?v=' + id;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = 'Ver vídeo de YouTube';
+      $('question-media-preview').append(a);
+      return;
+    }
+    if (!ownerId || !config || !q.media.src.startsWith(ownerId + '/assets/')) {
+      message($('question-media-status'), 'El archivo no pertenece a la cuenta activa.', 'error');
+      return;
+    }
+    if (!(await refreshAccess())) return;
+    try {
+      const response = await fetch(config.supabaseUrl + '/storage/v1/object/authenticated/quiz-media/' + q.media.src, {
+        headers: { apikey: config.publishableKey, Authorization: 'Bearer ' + accessToken },
+        cache: 'no-store',
+      });
+      if (!response.ok) throw Error('not_found');
+      const blob = await response.blob();
+      if (token !== mediaPreviewVersion) return;
+      const url = URL.createObjectURL(blob);
+      mediaPreviewUrl = url;
+      const el = document.createElement(q.media.type === 'video' ? 'video' : 'img');
+      el.src = url;
+      if (q.media.type === 'video') {
+        el.controls = true; el.preload = 'metadata';
+      } else el.alt = 'Vista previa de la pregunta';
+      $('question-media-preview').append(el);
+    } catch {
+      if (token === mediaPreviewVersion)
+        message($('question-media-status'), 'No se ha podido cargar el archivo privado.', 'error');
+    }
+  }
+
+  $('question-media-upload').addEventListener('click', () => {
+    if (quizDraft && !mediaUploading) $('question-media-file').click();
+  });
+  $('question-media-file').addEventListener('change', async () => {
+    const file = $('question-media-file').files[0];
+    $('question-media-file').value = '';
+    if (!file || !quizDraft || mediaUploading) return;
+    const ext = allowedMedia[file.type];
+    const limit = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (!ext || !file.size || file.size > limit) {
+      message($('question-media-status'), 'Formato no admitido o archivo demasiado grande.', 'error');
+      return;
+    }
+    if (!ownerId || !(await refreshAccess())) {
+      message($('question-media-status'), 'No se ha podido verificar tu sesión.', 'error');
+      return;
+    }
+    const currentQuestion = quizDraft.questions[quizSelection];
+    const currentQuiz = quizDraft;
+    const id = crypto.randomUUID();
+    const path = ownerId + '/assets/' + id + '.' + ext;
+    mediaUploading = true;
+    $('question-media-upload').disabled = true;
+    message($('question-media-status'), 'Subiendo a tu almacenamiento privado…');
+    try {
+      const response = await fetch(config.supabaseUrl + '/storage/v1/object/quiz-media/' + path, {
+        method: 'POST',
+        headers: {
+          apikey: config.publishableKey,
+          Authorization: 'Bearer ' + accessToken,
+          'Content-Type': file.type,
+          'x-upsert': 'false',
+          'cache-control': 'no-store',
+        },
+        body: file,
+      });
+      if (!response.ok) throw Error('upload_failed');
+      if (currentQuiz !== quizDraft || !currentQuiz.questions.includes(currentQuestion)) return;
+      currentQuestion.media = { type: file.type.startsWith('video/') ? 'video' : 'image', src: path };
+      markQuizDirty();
+      await renderMediaPreview();
+      message($('question-media-status'), 'Archivo subido. Guarda el cuestionario para conservar la referencia.', 'success');
+    } catch {
+      message($('question-media-status'), 'No se pudo subir el archivo. Comprueba permisos y conexión.', 'error');
+    } finally {
+      mediaUploading = false;
+      $('question-media-upload').disabled = false;
+    }
+  });
+  $('question-media-youtube').addEventListener('click', () => {
+    if (!quizDraft) return;
+    $('question-media-youtube-form').hidden = false;
+    $('question-media-youtube-url').focus();
+  });
+  $('question-media-youtube-save').addEventListener('click', () => {
+    if (!quizDraft) return;
+    const id = youtubeIdFromUrl($('question-media-youtube-url').value.trim());
+    if (!id) {
+      message($('question-media-status'), 'Introduce una URL válida de YouTube.', 'error');
+      return;
+    }
+    quizDraft.questions[quizSelection].media = { type: 'youtube', src: 'https://www.youtube.com/watch?v=' + id };
+    $('question-media-youtube-url').value = '';
+    markQuizDirty();
+    void renderMediaPreview();
+  });
+  $('question-media-remove').addEventListener('click', () => {
+    if (!quizDraft) return;
+    quizDraft.questions[quizSelection].media = null;
+    markQuizDirty();
+    void renderMediaPreview();
+  });
+
   function blankQuestion(type = 'quiz') {
     return {
       type, text: '',
@@ -383,6 +537,7 @@
     if (!force && quizDirty && !window.confirm('Hay cambios sin guardar. ¿Descartarlos?')) return;
     quizDraft = null;
     quizDirty = false;
+    clearMediaPreview();
     clearImportPreview();
     $('quiz-editor').hidden = true;
     $('quiz-question-editor').hidden = true;
@@ -437,6 +592,7 @@
     $('question-points').value = String(q.points ?? 1);
     $('question-points').disabled = q.type === 'poll';
     $('question-explanation').value = q.explanation || '';
+    void renderMediaPreview();
     const options = $('question-options');
     options.replaceChildren();
     const values = q.type === 'truefalse' ? ['Verdadero', 'Falso'] : (q.options || []).concat(['', '', '', '']).slice(0, 4);
