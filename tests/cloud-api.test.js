@@ -271,3 +271,83 @@ test('cuestionario cloud: edición exige propietario y devuelve 404 si no existe
     keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
   }
 });
+
+test('duplicar un cuestionario verifica la propiedad y crea una copia independiente', async () => {
+  const previous = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const id = 'ac16f472-f345-469e-8f24-5d978073a79b';
+  const calls = [];
+  const fake = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (options.method === 'POST') {
+      const data = JSON.parse(options.body);
+      return mock([{ ...data, id: '6c31c119-76af-4ac5-8ea6-c42522034e03' }], 201);
+    }
+    return mock([{
+      id, title: 'Curso de IA', description: '', project_id: null,
+      settings: { defaultTime: 20, showTextOnDevice: false, allowLateJoin: true },
+      questions: [{ type: 'quiz', text: 'Pregunta', options: ['Uno', 'Dos'], correct: [0], time: 20, points: 1, media: null }]
+    }]);
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const endpoint = base + '/api/cloud/quizzes/' + id + '/duplicate';
+      const unauth = await fetch(endpoint, { method: 'POST' });
+      assert.equal(unauth.status, 401);
+      const authorized = await fetch(endpoint, { method: 'POST', headers: { Authorization: 'Bearer test.jwt.signature' } });
+      assert.equal(authorized.status, 201);
+      const result = await authorized.json();
+      assert.equal(result.title, 'Curso de IA (copia)');
+      assert.equal(result.owner_id, USER);
+      const read = calls.find(c => c.url.includes('id=eq.'));
+      assert.ok(read.url.includes('owner_id=eq.' + USER));
+      const write = calls.find(c => c.options.method === 'POST');
+      assert.equal(write.options.headers.Authorization, 'Bearer test.jwt.signature');
+      assert.notEqual(result.id, id);
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((k,i) => {
+      if (previous[i] === undefined) delete process.env[k]; else process.env[k] = previous[i];
+    });
+  }
+});
+
+test('eliminar un cuestionario restringe el borrado por propietario y detecta inexistentes', async () => {
+  const previous = [process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, process.env.SUPABASE_ANON_KEY];
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const id = 'ac16f472-f345-469e-8f24-5d978073a79b';
+  let exists = false;
+  let deleteUrl = '';
+  const fake = async (url, options) => {
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (options.method === 'DELETE') {
+      deleteUrl = String(url);
+      return mock(exists ? [{ id }] : []);
+    }
+    throw Error('Unexpected fetch');
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const headers = { Authorization: 'Bearer test.jwt.signature' };
+      const endpoint = base + '/api/cloud/quizzes/' + id;
+      assert.equal((await fetch(endpoint, { method: 'DELETE' })).status, 401);
+      assert.equal((await fetch(base + '/api/cloud/quizzes/bad-id', { method: 'DELETE', headers })).status, 400);
+      assert.equal((await fetch(endpoint, { method: 'DELETE', headers })).status, 404);
+      exists = true;
+      const result = await fetch(endpoint, { method: 'DELETE', headers });
+      assert.equal(result.status, 200);
+      assert.deepEqual(await result.json(), { deleted: true, id });
+      assert.ok(deleteUrl.includes('owner_id=eq.' + USER));
+      assert.ok(deleteUrl.includes('id=eq.' + id));
+    });
+  } finally {
+    ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'].forEach((k,i) => {
+      if (previous[i] === undefined) delete process.env[k]; else process.env[k] = previous[i];
+    });
+  }
+});
