@@ -17,8 +17,10 @@ const tunnel = require('./tunnel');
 const { DATA_DIR, ensureDataDirs } = require('./paths');
 const { version: VERSION, repository } = require('./package.json');
 
+// En la nube, durante la migración, arrancamos sin tocar el sistema de archivos local.
+const IS_CLOUD = process.env.VERCEL === '1' || process.env.QUIZ_RUNTIME === 'cloud';
 const PORT = Number(process.env.PORT) || 3000;
-ensureDataDirs();
+if (!IS_CLOUD) ensureDataDirs();
 
 // ---------- Aviso de versión nueva (consulta GitHub al arrancar; sin internet, se ignora) ----------
 
@@ -29,7 +31,7 @@ const newer = (a, b) => {
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
   return false;
 };
-if (REPO) {
+if (REPO && !IS_CLOUD) {
   fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { signal: AbortSignal.timeout(5000) })
     .then((r) => (r.ok ? r.json() : null))
     .then((r) => { if (r?.tag_name && newer(r.tag_name, VERSION)) latestRelease = { version: r.tag_name.replace(/^v/, ''), url: r.html_url }; })
@@ -39,6 +41,19 @@ if (REPO) {
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// Despliegue seguro por defecto: hasta tener autenticación, BD y Redis,
+// el modo nube solo responde a health-check. La versión local no cambia.
+if (IS_CLOUD) {
+  io.use((_socket, next) => next(new Error('cloud_setup_required')));
+  app.use((req, res, next) => {
+    if (req.path === '/api/health') return next();
+    return res.status(503).json({
+      error: 'cloud_setup_required',
+      message: 'La versión en la nube aún no está habilitada.',
+    });
+  });
+}
 
 // ---------- Utilidades ----------
 
@@ -227,7 +242,9 @@ app.get('/editor', localOnly, sendPage('editor.html'));
 app.get('/play', sendPage('play.html'));
 
 // Comprobación de que el servidor responde (la usa el túnel antes de dar la dirección).
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/health', (req, res) => res.json(
+  IS_CLOUD ? { ok: true, runtime: 'cloud', ready: false } : { ok: true },
+));
 
 app.get('/api/branding', (req, res) => {
   const room = rooms.get(String(req.query.pin || ''));
@@ -506,11 +523,22 @@ server.on('error', (e) => {
   throw e;
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  Quiz en marcha (versión ${VERSION})`);
-  console.log(`  Presentador: http://localhost:${PORT}/host`);
-  for (const a of lanAddresses()) console.log(`  Jugadores (${a.name}): http://${a.address}:${PORT}/play`);
-  console.log(`  Tus datos se guardan en: ${DATA_DIR}`);
-  console.log('  Para cerrar la aplicación, cierra esta ventana.\n');
-  process.emit('quiz:ready', PORT);
-});
+// Arranque exclusivo del modo escritorio; Vercel recibe el servidor exportado.
+function startLocalServer() {
+  if (IS_CLOUD) throw new Error('El modo cloud no puede iniciarse como servidor local.');
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n  Quiz en marcha (versión ${VERSION})`);
+    console.log(`  Presentador: http://localhost:${PORT}/host`);
+    for (const a of lanAddresses()) console.log(`  Jugadores (${a.name}): http://${a.address}:${PORT}/play`);
+    console.log(`  Tus datos se guardan en: ${DATA_DIR}`);
+    console.log('  Para cerrar la aplicación, cierra esta ventana.\n');
+    process.emit('quiz:ready', PORT);
+  });
+  return server;
+}
+
+if (require.main === module && !IS_CLOUD) startLocalServer();
+
+// Export HTTP.Server para que Vercel pueda usar Express y los upgrades WebSocket.
+module.exports = server;
+module.exports.startLocalServer = startLocalServer;
