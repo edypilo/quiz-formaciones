@@ -224,6 +224,149 @@
     }
   }
 
+
+  let importPreview = null;
+
+  function clearImportPreview() {
+    importPreview = null;
+    $('quiz-import-preview').hidden = true;
+    $('quiz-import-file').value = '';
+  }
+
+  // Descarga autorizada usando el token, sin exponer un enlace directo con JWT.
+  async function downloadCloud(url, filename) {
+    if (!(await refreshAccess())) {
+      closeSession();
+      message(status, 'La sesión ha caducado. Vuelve a entrar.', 'error');
+      return;
+    }
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: 'Bearer ' + accessToken },
+        cache: 'no-store',
+      });
+      if (response.status === 401) {
+        closeSession();
+        message(status, 'La sesión ha caducado. Vuelve a entrar.', 'error');
+        return;
+      }
+      if (!response.ok) throw Error('download_failed');
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch {
+      message(dashboardStatus, 'No se pudo descargar el archivo.', 'error');
+    }
+  }
+
+  $('quiz-template-xlsx').addEventListener('click',
+    () => downloadCloud('/api/cloud/templates/xlsx', 'plantilla-quizzz.xlsx'));
+  $('quiz-template-docx').addEventListener('click',
+    () => downloadCloud('/api/cloud/templates/docx', 'plantilla-quizzz.docx'));
+
+  async function downloadQuiz(format) {
+    if (!quizDraft) return;
+    if (quizDraft.id && quizDirty && !window.confirm(
+      'La exportación utiliza la última versión guardada. ¿Continuar sin guardar los cambios actuales?')) return;
+    if (!quizDraft.id) {
+      message($('quiz-status'), 'Guarda primero el cuestionario para exportarlo.', 'error');
+      return;
+    }
+    await downloadCloud(
+      '/api/cloud/quizzes/' + encodeURIComponent(quizDraft.id) + '/export.' + format,
+      'quizzz-cuestionario.' + format);
+  }
+  $('quiz-export-xlsx').addEventListener('click', () => downloadQuiz('xlsx'));
+  $('quiz-export-docx').addEventListener('click', () => downloadQuiz('docx'));
+  $('quiz-import').addEventListener('click', () => {
+    if (quizDraft) $('quiz-import-file').click();
+  });
+  $('quiz-import-cancel').addEventListener('click', clearImportPreview);
+  $('quiz-import-file').addEventListener('change', async () => {
+    const file = $('quiz-import-file').files[0];
+    $('quiz-import-file').value = '';
+    if (!file) return;
+    if (!/\.(xlsx|docx)$/i.test(file.name) || file.size > 5 * 1024 * 1024 || file.size === 0) {
+      message($('quiz-status'), 'Selecciona un .xlsx o .docx de hasta 5 MB.', 'error');
+      return;
+    }
+    if (!(await refreshAccess())) {
+      closeSession();
+      message(status, 'La sesión ha caducado. Vuelve a entrar.', 'error');
+      return;
+    }
+    try {
+      message($('quiz-status'), 'Analizando archivo…');
+      const response = await fetch('/api/cloud/import', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + accessToken,
+          'Content-Type': 'application/octet-stream',
+          'X-Filename': file.name,
+        },
+        body: file,
+        cache: 'no-store',
+      });
+      if (response.status === 401) {
+        closeSession();
+        message(status, 'La sesión ha caducado. Vuelve a entrar.', 'error');
+        return;
+      }
+      const result = await json(response);
+      if (!response.ok || !Array.isArray(result?.questions))
+        throw Error('import_failed');
+      if (!result.questions.length) {
+        message($('quiz-status'), 'El archivo no contiene preguntas.', 'error');
+        return;
+      }
+      importPreview = result;
+      $('quiz-import-summary').textContent =
+        result.questions.length + ' preguntas encontradas en «' + file.name + '». Comprueba los avisos antes de importar.';
+      const warnings = $('quiz-import-warnings');
+      warnings.replaceChildren();
+      for (const warning of (result.warnings || []).slice(0, 100)) {
+        const p = document.createElement('p');
+        p.textContent = '⚠ ' + warning;
+        warnings.append(p);
+      }
+      if (result.warnings?.length > 100) {
+        const p = document.createElement('p');
+        p.textContent = 'Hay más avisos. Revisa el archivo antes de continuar.';
+        warnings.append(p);
+      }
+      $('quiz-import-preview').hidden = false;
+      message($('quiz-status'), 'Archivo analizado. Decide cómo importar las preguntas.');
+    } catch {
+      message($('quiz-status'), 'No se ha podido leer el archivo. Comprueba que utilizas la plantilla.', 'error');
+    }
+  });
+
+  function applyImportedQuestions(replace) {
+    if (!quizDraft || !importPreview) return;
+    const questions = importPreview.questions.map((q) => structuredClone(q));
+    if (!replace && quizDraft.questions.length + questions.length > 200) {
+      message($('quiz-status'), 'Un cuestionario no puede superar 200 preguntas.', 'error');
+      return;
+    }
+    if (replace && !window.confirm('Se sustituirán todas las preguntas actuales sin guardar. ¿Continuar?')) return;
+    const previousLength = quizDraft.questions.length;
+    quizDraft.questions = replace ? questions : [...quizDraft.questions, ...questions];
+    quizSelection = replace ? 0 : previousLength;
+    clearImportPreview();
+    markQuizDirty();
+    renderQuestionNav();
+    renderQuestionEditor();
+    message($('quiz-status'), 'Preguntas incorporadas al borrador. Pulsa Guardar cuestionario para conservarlas.', 'success');
+  }
+  $('quiz-import-append').addEventListener('click', () => applyImportedQuestions(false));
+  $('quiz-import-replace').addEventListener('click', () => applyImportedQuestions(true));
+
   function blankQuestion(type = 'quiz') {
     return {
       type, text: '',
@@ -240,6 +383,7 @@
     if (!force && quizDirty && !window.confirm('Hay cambios sin guardar. ¿Descartarlos?')) return;
     quizDraft = null;
     quizDirty = false;
+    clearImportPreview();
     $('quiz-editor').hidden = true;
     $('quiz-question-editor').hidden = true;
   }
@@ -335,6 +479,7 @@
       questions: [blankQuestion()],
     };
     quizDraft.questions = Array.isArray(quizDraft.questions) ? quizDraft.questions : [];
+    clearImportPreview();
     $('quiz-editor-heading').textContent = quiz ? 'Editar cuestionario' : 'Nuevo cuestionario';
     $('quiz-title').value = quizDraft.title;
     $('quiz-description').value = quizDraft.description || '';
