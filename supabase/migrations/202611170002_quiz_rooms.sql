@@ -27,7 +27,9 @@ create index if not exists quiz_rooms_owner_created_idx
 
 alter table public.quiz_rooms enable row level security;
 revoke all on public.quiz_rooms from anon;
-grant select, insert, update, delete on public.quiz_rooms to authenticated;
+grant select, insert on public.quiz_rooms to authenticated;
+-- Sólo se puede modificar status, nunca PIN, dueño, caducidad o cuestionario.
+grant update(status) on public.quiz_rooms to authenticated;
 
 drop policy if exists quiz_rooms_select_own on public.quiz_rooms;
 create policy quiz_rooms_select_own on public.quiz_rooms
@@ -44,7 +46,7 @@ for insert to authenticated with check (
 drop policy if exists quiz_rooms_update_own on public.quiz_rooms;
 create policy quiz_rooms_update_own on public.quiz_rooms
 for update to authenticated using (owner_id = (select auth.uid()))
-with check (owner_id = (select auth.uid()));
+with check (owner_id = (select auth.uid()) and status = 'closed');
 
 -- No se autoriza DELETE todavía; los PIN se liberan cerrando la sala.
 -- El acceso de los participantes se implementará en una migración posterior,
