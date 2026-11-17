@@ -72,6 +72,12 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
     assert.equal(landing.status, 200);
     assert.match(await landing.text(), /Versión cloud en preparación/);
     assert.equal(landing.headers.get('x-robots-tag'), 'noindex, nofollow');
+    const cloudAdmin = await fetch(`${base}/cloud-admin`);
+    assert.equal(cloudAdmin.status, 200);
+    assert.match(await cloudAdmin.text(), /Gestiona tus cuestionarios/);
+    const adminScript = await fetch(`${base}/cloud-admin.js`);
+    assert.equal(adminScript.status, 200);
+    assert.match(await adminScript.text(), /authentication|auth\\/v1/);
     for (const target of ['/host', '/editor', '/admin', '/api/quizzes', '/play', '/admin.html', '/editor.html']) {
       const response = await fetch(`${base}${target}`);
       assert.equal(response.status, 503, target);
