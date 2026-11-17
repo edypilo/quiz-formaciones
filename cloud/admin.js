@@ -16,6 +16,11 @@
   let pendingRefresh = null;
   let projectsCache = [];
   let editingProjectId = null;
+  let quizzesCache = [];
+  let quizDraft = null;
+  let quizSelection = 0;
+  let quizDirty = false;
+
 
   function message(el, text, type = '') {
     el.textContent = text;
@@ -62,7 +67,15 @@
       sub.textContent = kind === 'cuestionarios' ? (String(record.description || '').slice(0, 120) || 'Cuestionario') : (String(record.organization || '').slice(0, 80) || 'Proyecto');
       const content = document.createElement('div');
       content.append(title, sub);
-      if (kind === 'proyectos') {
+      if (kind === 'cuestionarios') {
+        li.classList.add('project-row');
+        const edit = document.createElement('button');
+        edit.className = 'minor';
+        edit.type = 'button';
+        edit.textContent = 'Editar';
+        edit.addEventListener('click', () => openQuizEditor(record));
+        li.append(content, edit);
+      } else if (kind === 'proyectos') {
         li.classList.add('project-row');
         const edit = document.createElement('button');
         edit.className = 'minor';
@@ -112,7 +125,9 @@
     $('project-list').replaceChildren();
     $('quiz-list').replaceChildren();
     projectsCache = [];
+    quizzesCache = [];
     closeProjectEditor();
+    closeQuizEditor(true);
     if (token && config) {
       void fetch(config.supabaseUrl + '/auth/v1/logout', {
         method: 'POST',
@@ -148,12 +163,203 @@
       if (!identity?.id || !Array.isArray(projects) || !Array.isArray(quizzes)) throw new Error('invalid_data');
       projectsCache = safeArray(projects);
       renderList('project-list', projectsCache, 'proyectos');
-      renderList('quiz-list', safeArray(quizzes), 'cuestionarios');
+      quizzesCache = safeArray(quizzes);
+      renderList('quiz-list', quizzesCache, 'cuestionarios');
       message(dashboardStatus, 'Conexión verificada. Consulta de solo lectura.', 'success');
     } catch {
       message(dashboardStatus, 'No se han podido cargar los datos. Comprueba la conexión.', 'error');
     }
   }
+
+
+  function blankQuestion(type = 'quiz') {
+    return {
+      type, text: '',
+      options: type === 'truefalse' ? ['Verdadero', 'Falso'] : ['', '', '', ''],
+      correct: [], time: Number($('quiz-time').value || 20),
+      points: type === 'poll' ? 0 : 1, explanation: '', media: null,
+    };
+  }
+  function markQuizDirty() {
+    quizDirty = true;
+    $('quiz-dirty').textContent = 'Cambios sin guardar';
+  }
+  function closeQuizEditor(force = false) {
+    if (!force && quizDirty && !window.confirm('Hay cambios sin guardar. ¿Descartarlos?')) return;
+    quizDraft = null;
+    quizDirty = false;
+    $('quiz-editor').hidden = true;
+    $('quiz-question-editor').hidden = true;
+  }
+  function renderQuestionNav() {
+    const list = $('quiz-question-list');
+    list.replaceChildren();
+    quizDraft.questions.forEach((q, i) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'question-card';
+      button.setAttribute('aria-current', String(quizSelection === i));
+      button.textContent = (i + 1) + '. ' + (q.text || 'Pregunta sin completar') + ' · ' +
+        (q.type === 'truefalse' ? 'Verdadero/Falso' : q.type === 'poll' ? 'Encuesta' : 'Quiz');
+      button.addEventListener('click', () => {
+        quizSelection = i;
+        renderQuestionNav();
+        renderQuestionEditor();
+      });
+      list.append(button);
+    });
+  }
+  function renderQuestionEditor() {
+    const q = quizDraft.questions[quizSelection];
+    $('quiz-question-editor').hidden = !q;
+    if (!q) return;
+    $('question-type').value = q.type;
+    $('question-time').value = String(q.time || 20);
+    $('question-text').value = q.text || '';
+    $('question-points').value = String(q.points ?? 1);
+    $('question-points').disabled = q.type === 'poll';
+    $('question-explanation').value = q.explanation || '';
+    const options = $('question-options');
+    options.replaceChildren();
+    const values = q.type === 'truefalse' ? ['Verdadero', 'Falso'] : (q.options || []).concat(['', '', '', '']).slice(0, 4);
+    values.forEach((answer, i) => {
+      const row = document.createElement('label');
+      row.className = 'question-option';
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.checked = (q.correct || []).includes(i);
+      check.disabled = q.type === 'poll';
+      check.title = 'Respuesta correcta';
+      check.addEventListener('change', () => {
+        if (q.type === 'truefalse' && check.checked) q.correct = [i];
+        else if (check.checked) q.correct = [...new Set([...(q.correct || []), i])];
+        else q.correct = (q.correct || []).filter((value) => value !== i);
+        markQuizDirty();
+        renderQuestionEditor();
+      });
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 120;
+      input.value = answer;
+      input.placeholder = 'Respuesta ' + (i + 1);
+      input.disabled = q.type === 'truefalse';
+      input.addEventListener('input', () => {
+        q.options[i] = input.value;
+        markQuizDirty();
+      });
+      row.append(check, input);
+      options.append(row);
+    });
+  }
+  function openQuizEditor(quiz = null) {
+    if (quizDraft && quizDirty && !window.confirm('Hay cambios sin guardar. ¿Descartarlos?')) return;
+    closeProjectEditor();
+    const defaultTime = Number(quiz?.settings?.defaultTime || 20);
+    quizDraft = quiz ? structuredClone(quiz) : {
+      title: 'Cuestionario sin título', description: '', project_id: null,
+      settings: { defaultTime: 20, showTextOnDevice: false, allowLateJoin: true },
+      questions: [blankQuestion()],
+    };
+    quizDraft.questions = Array.isArray(quizDraft.questions) ? quizDraft.questions : [];
+    $('quiz-editor-heading').textContent = quiz ? 'Editar cuestionario' : 'Nuevo cuestionario';
+    $('quiz-title').value = quizDraft.title;
+    $('quiz-description').value = quizDraft.description || '';
+    $('quiz-time').value = String(defaultTime);
+    $('quiz-device-text').checked = !!quizDraft.settings?.showTextOnDevice;
+    $('quiz-late').checked = quizDraft.settings?.allowLateJoin !== false;
+    const projectsSelect = $('quiz-project');
+    projectsSelect.replaceChildren(new Option('Sin proyecto', ''));
+    projectsCache.forEach((project) => projectsSelect.add(new Option(project.name, project.id)));
+    projectsSelect.value = quizDraft.project_id || '';
+    quizSelection = 0;
+    quizDirty = false;
+    $('quiz-dirty').textContent = '';
+    message($('quiz-status'), '');
+    $('quiz-editor').hidden = false;
+    renderQuestionNav();
+    renderQuestionEditor();
+    $('quiz-title').focus();
+  }
+
+  $('new-quiz').addEventListener('click', () => openQuizEditor());
+  $('quiz-cancel').addEventListener('click', () => closeQuizEditor());
+  $('quiz-add-question').addEventListener('click', () => {
+    if (!quizDraft || quizDraft.questions.length >= 200) return;
+    quizDraft.questions.push(blankQuestion());
+    quizSelection = quizDraft.questions.length - 1;
+    markQuizDirty();
+    renderQuestionNav();
+    renderQuestionEditor();
+  });
+  $('question-duplicate').addEventListener('click', () => {
+    if (!quizDraft || quizDraft.questions.length >= 200) return;
+    quizDraft.questions.splice(quizSelection + 1, 0, structuredClone(quizDraft.questions[quizSelection]));
+    quizSelection++;
+    markQuizDirty(); renderQuestionNav(); renderQuestionEditor();
+  });
+  $('question-remove').addEventListener('click', () => {
+    if (!quizDraft || !window.confirm('¿Eliminar esta pregunta?')) return;
+    quizDraft.questions.splice(quizSelection, 1);
+    quizSelection = Math.max(0, Math.min(quizSelection, quizDraft.questions.length - 1));
+    markQuizDirty(); renderQuestionNav(); renderQuestionEditor();
+  });
+  for (const [id, property] of [
+    ['quiz-title', 'title'], ['quiz-description', 'description'],
+  ]) $(''+id).addEventListener('input', () => { if (quizDraft) { quizDraft[property] = $(id).value; markQuizDirty(); } });
+  $('quiz-project').addEventListener('change', () => { quizDraft.project_id = $('quiz-project').value || null; markQuizDirty(); });
+  $('quiz-time').addEventListener('change', () => { quizDraft.settings.defaultTime = Number($('quiz-time').value); markQuizDirty(); });
+  $('quiz-device-text').addEventListener('change', () => { quizDraft.settings.showTextOnDevice = $('quiz-device-text').checked; markQuizDirty(); });
+  $('quiz-late').addEventListener('change', () => { quizDraft.settings.allowLateJoin = $('quiz-late').checked; markQuizDirty(); });
+  $('question-type').addEventListener('change', () => {
+    const q = quizDraft.questions[quizSelection], type = $('question-type').value;
+    q.type = type;
+    q.correct = [];
+    q.options = type === 'truefalse' ? ['Verdadero', 'Falso'] : ['', '', '', ''];
+    q.points = type === 'poll' ? 0 : 1;
+    markQuizDirty(); renderQuestionNav(); renderQuestionEditor();
+  });
+  $('question-time').addEventListener('change', () => { quizDraft.questions[quizSelection].time = Number($('question-time').value); markQuizDirty(); });
+  $('question-text').addEventListener('input', () => { quizDraft.questions[quizSelection].text = $('question-text').value; markQuizDirty(); renderQuestionNav(); });
+  $('question-points').addEventListener('change', () => { quizDraft.questions[quizSelection].points = Number($('question-points').value); markQuizDirty(); });
+  $('question-explanation').addEventListener('input', () => { quizDraft.questions[quizSelection].explanation = $('question-explanation').value; markQuizDirty(); });
+
+  $('quiz-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!quizDraft || !(await refreshAccess())) {
+      closeSession(); message(status, 'La sesión ha caducado. Vuelve a entrar.', 'error'); return;
+    }
+    const save = $('quiz-submit');
+    save.disabled = true;
+    message($('quiz-status'), 'Guardando cuestionario…');
+    try {
+      const editing = !!quizDraft.id;
+      const url = editing ? '/api/cloud/quizzes/' + encodeURIComponent(quizDraft.id) : '/api/cloud/quizzes';
+      const response = await fetch(url, {
+        method: editing ? 'PATCH' : 'POST',
+        headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: quizDraft.title, description: quizDraft.description,
+          project_id: quizDraft.project_id, settings: quizDraft.settings, questions: quizDraft.questions,
+        }), cache: 'no-store',
+      });
+      if (response.status === 401) {
+        closeSession(); message(status, 'La sesión ha caducado. Vuelve a entrar.', 'error'); return;
+      }
+      if (!response.ok) {
+        message($('quiz-status'), 'No se pudo guardar. Comprueba las preguntas y el proyecto.', 'error'); return;
+      }
+      const saved = await json(response);
+      if (!saved?.id) throw new Error('save_response');
+      quizDraft = saved;
+      quizDirty = false;
+      $('quiz-dirty').textContent = '';
+      message($('quiz-status'), 'Borrador guardado correctamente en Supabase.', 'success');
+      await loadData();
+      renderQuestionNav();
+    } catch {
+      message($('quiz-status'), 'Error de conexión al guardar el cuestionario.', 'error');
+    } finally { save.disabled = false; }
+  });
 
   $('new-project').addEventListener('click', () => openProjectEditor());
   $('project-cancel').addEventListener('click', closeProjectEditor);
