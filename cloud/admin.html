@@ -39,7 +39,7 @@
     .items{list-style:none;margin:0;padding:0;display:grid;gap:10px}
     .items li{padding:12px 15px;border-radius:11px;background:#f4f7fc;border:1px solid #e6ecf7}
     .items .name{font-weight:750;display:block;overflow-wrap:anywhere}.items .sub{display:block;color:#52627e;margin-top:3px;font-size:.88rem}
-    .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px}.actions button{font-size:.9rem;padding:10px 14px}.project-row{display:flex;justify-content:space-between;gap:10px;align-items:center}.project-row button{font-size:.78rem;padding:7px 10px;flex-shrink:0}.project-form{max-width:none;margin-bottom:25px}.project-form .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}.project-form .fields label{margin-top:12px}.project-form .buttons{display:flex;align-items:center;gap:10px;margin-top:18px}.footer{font-size:.82rem;color:#71809b;margin-top:30px;line-height:1.55}
+    .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px}.actions button{font-size:.9rem;padding:10px 14px}.project-row{display:flex;justify-content:space-between;gap:10px;align-items:center}.project-row button{font-size:.78rem;padding:7px 10px;flex-shrink:0}.project-form{max-width:none;margin-bottom:25px}.project-form .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}.project-form .fields label{margin-top:12px}.project-form .buttons{display:flex;align-items:center;gap:10px;margin-top:18px}.question-options{display:grid;gap:10px;margin:16px 0}.question-option{display:flex;align-items:center;gap:10px}.question-option input[type=text]{flex:1;min-width:0}.question-option input[type=checkbox]{width:20px;height:20px;flex-shrink:0}.project-form select,.project-form textarea{width:100%;border:1.5px solid #d6deed;border-radius:12px;padding:12px;font:inherit;background:white;color:#182747}.project-form input[type=checkbox]{display:inline-block;width:auto;margin-right:8px}.question-option input[type=checkbox]{width:20px}.question-card{width:100%;display:flex;gap:10px;justify-content:space-between;text-align:left;background:#f1f5fe;color:#193264;border:1px solid #d5dff3;margin:5px 0}.question-card:hover{background:#e5edfe}.question-card[aria-current=true]{outline:2px solid #315cce}.footer{font-size:.82rem;color:#71809b;margin-top:30px;line-height:1.55}
     @media(max-width:720px){.columns,.project-form .fields{grid-template-columns:1fr}.toolbar{align-items:stretch}.intro{margin-bottom:22px}}
   </style>
   <script src="/cloud-admin.js" defer></script>
@@ -66,6 +66,41 @@
     <section id="dashboard-section" hidden aria-labelledby="dash-heading">
       <div class="toolbar"><div><h2 id="dash-heading">Tu espacio de trabajo</h2><p id="signed-user" class="hint"></p></div>
         <button id="sign-out" type="button" class="minor">Cerrar sesión</button></div>
+      <div id="quiz-editor" class="card project-form" hidden>
+        <div class="actions"><h3 id="quiz-editor-heading" style="margin:0;flex:1">Nuevo cuestionario</h3><button class="minor" type="button" id="quiz-cancel">Cerrar editor</button></div>
+        <p class="hint">Guarda borradores aunque haya preguntas incompletas. Imágenes, importación y partidas estarán disponibles en próximas fases.</p>
+        <form id="quiz-form">
+          <div class="fields">
+            <div><label for="quiz-title">Título del cuestionario</label><input id="quiz-title" maxlength="120" required></div>
+            <div><label for="quiz-project">Proyecto asociado</label><select id="quiz-project"><option value="">Sin proyecto</option></select></div>
+            <div><label for="quiz-description">Descripción</label><input id="quiz-description" maxlength="300"></div>
+            <div><label for="quiz-time">Tiempo predeterminado (segundos)</label><select id="quiz-time">
+              <option>5</option><option>10</option><option selected>20</option><option>30</option><option>45</option><option>60</option><option>90</option><option>120</option><option>240</option>
+            </select></div>
+          </div>
+          <div class="fields">
+            <label><input type="checkbox" id="quiz-device-text"> Mostrar pregunta en el dispositivo</label>
+            <label><input type="checkbox" id="quiz-late" checked> Permitir incorporaciones tardías</label>
+          </div>
+          <div class="actions" style="margin-top:20px"><h3 style="margin:0;flex:1">Preguntas</h3><button type="button" id="quiz-add-question" class="minor">+ Añadir pregunta</button></div>
+          <div id="quiz-question-list" class="items"></div>
+          <div id="quiz-question-editor" hidden>
+            <div class="fields">
+              <div><label for="question-type">Tipo</label><select id="question-type"><option value="quiz">Quiz</option><option value="truefalse">Verdadero / Falso</option><option value="poll">Encuesta</option></select></div>
+              <div><label for="question-time">Tiempo (segundos)</label><select id="question-time"><option>5</option><option>10</option><option>20</option><option>30</option><option>45</option><option>60</option><option>90</option><option>120</option><option>240</option></select></div>
+            </div>
+            <label for="question-text">Enunciado</label><textarea id="question-text" maxlength="250" rows="3"></textarea>
+            <div id="question-options" class="question-options"></div>
+            <div class="fields">
+              <div><label for="question-points">Puntuación</label><select id="question-points"><option value="0">Sin puntos</option><option value="1">Estándar</option><option value="2">Doble</option></select></div>
+              <div><label for="question-explanation">Explicación tras responder</label><textarea id="question-explanation" maxlength="400" rows="2"></textarea></div>
+            </div>
+            <div class="actions"><button type="button" class="minor" id="question-duplicate">Duplicar pregunta</button><button type="button" class="minor" id="question-remove">Eliminar pregunta</button></div>
+          </div>
+          <div class="actions" style="margin-top:20px"><button id="quiz-submit" type="submit">Guardar cuestionario</button><span id="quiz-dirty" class="hint" style="margin:0"></span></div>
+          <p id="quiz-status" class="status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
       <div id="project-editor" class="card project-form" hidden>
         <h3 id="project-form-title">Nuevo proyecto</h3>
         <p class="hint">Identidad visual de una formación. La marca de Quizzz! se configura por separado.</p>
@@ -84,10 +119,10 @@
       </div>
       <div class="columns">
         <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Proyectos</h3><button id="new-project" type="button">+ Nuevo proyecto</button></div><ul class="items" id="project-list"></ul></article>
-        <article class="list-card"><h3>Cuestionarios</h3><ul class="items" id="quiz-list"></ul></article>
+        <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Cuestionarios</h3><button id="new-quiz" type="button">+ Nuevo cuestionario</button></div><ul class="items" id="quiz-list"></ul></article>
       </div>
       <p id="dashboard-status" class="status" role="status" aria-live="polite"></p>
     </section>
-    <p class="footer">Versión de prueba: consulta de datos únicamente. Por seguridad, la sesión se mantiene en memoria y se cierra al actualizar la página. El acceso a la aplicación sigue protegido por Vercel Authentication.</p>
+    <p class="footer">Versión de prueba: gestión de proyectos y borradores de cuestionarios. Por seguridad, la sesión se mantiene en memoria y se cierra al actualizar la página. El acceso a la aplicación sigue protegido por Vercel Authentication.</p>
   </main>
 </body></html>
