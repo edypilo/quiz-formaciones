@@ -68,7 +68,11 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
   await withServer(true, async (base) => {
     const health = await (await fetch(`${base}/api/health`)).json();
     assert.deepEqual(health, { ok: true, runtime: 'cloud', ready: false });
-    for (const target of ['/host', '/editor', '/admin', '/api/quizzes', '/play']) {
+    const landing = await fetch(`${base}/`);
+    assert.equal(landing.status, 200);
+    assert.match(await landing.text(), /Versión cloud en preparación/);
+    assert.equal(landing.headers.get('x-robots-tag'), 'noindex, nofollow');
+    for (const target of ['/host', '/editor', '/admin', '/api/quizzes', '/play', '/admin.html', '/editor.html']) {
       const response = await fetch(`${base}${target}`);
       assert.equal(response.status, 503, target);
       assert.equal((await response.json()).error, 'cloud_setup_required');
