@@ -35,6 +35,14 @@ async function readJson(response) {
 
 function makeRouter(fetcher = fetch) {
   const router = express.Router();
+  // Únicamente datos públicos del proyecto: nunca devolver claves de servicio.
+  router.get('/config', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const config = configuration();
+    if (!config) return res.status(503).json({ error: 'supabase_not_configured' });
+    return res.json({ supabaseUrl: config.url, publishableKey: config.key });
+  });
+
   router.use(async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     const config = configuration();
