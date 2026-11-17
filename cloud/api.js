@@ -3,6 +3,7 @@
 // Fase 2: API de lectura cloud aislada. La app de escritorio no usa este módulo.
 // No se utiliza SERVICE_ROLE_KEY: PostgreSQL aplica RLS con el JWT real del usuario.
 const express = require('express');
+const crypto = require('node:crypto');
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const tables = Object.freeze({
@@ -480,6 +481,133 @@ function makeRouter(fetcher = fetch) {
       return res.status(200).send(buffer);
     } catch {
       return res.status(500).json({ error: 'export_generation_failed' });
+    }
+  });
+
+
+  // Primer hito del lobby: solamente el anfitrión autenticado puede
+  // preparar, consultar o cerrar salas. No hay endpoints públicos de PIN.
+  router.get('/rooms', async (req, res) => {
+    const { url, key, jwt, userId } = req.cloud;
+    const params = new URLSearchParams({
+      owner_id: 'eq.' + userId,
+      status: 'eq.waiting',
+      expires_at: 'gt.' + new Date().toISOString(),
+      select: 'id,quiz_id,pin,status,created_at,expires_at',
+      order: 'created_at.desc',
+      limit: '50',
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_rooms?' + params, {
+        headers: { apikey: key, Authorization: 'Bearer ' + jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const body = await readJson(response);
+      if (!response.ok || !Array.isArray(body))
+        return res.status(502).json({ error: 'rooms_unavailable_or_migration_required' });
+      return res.json(body);
+    } catch {
+      return res.status(502).json({ error: 'rooms_unavailable_or_migration_required' });
+    }
+  });
+
+  router.post('/rooms', express.json({ limit: '2kb' }), async (req, res) => {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) ||
+      typeof req.body.quiz_id !== 'string' || !uuid.test(req.body.quiz_id))
+      return res.status(400).json({ error: 'invalid_quiz_id' });
+    const { url, key, jwt, userId } = req.cloud;
+    try {
+      const lookup = new URLSearchParams({
+        id: 'eq.' + req.body.quiz_id,
+        owner_id: 'eq.' + userId,
+        select: 'id,title,questions',
+        limit: '1',
+      });
+      const check = await fetcher(url + '/rest/v1/quiz_quizzes?' + lookup, {
+        headers: { apikey: key, Authorization: 'Bearer ' + jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const quizzes = await readJson(check);
+      if (!check.ok || !Array.isArray(quizzes))
+        return res.status(502).json({ error: 'quiz_query_failed' });
+      if (!quizzes.length) return res.status(404).json({ error: 'quiz_not_found' });
+      const quiz = quizzes[0];
+      if (!Array.isArray(quiz.questions) || !quiz.questions.length ||
+        quiz.questions.some((q) => normalizeQuestion(q, 20).errors.length))
+        return res.status(422).json({ error: 'quiz_has_incomplete_questions' });
+
+      // Recupera PIN antiguos si su tiempo de vida terminó. No afecta a
+      // salas activas de otros propietarios y no borra registros.
+      const expired = new URLSearchParams({
+        owner_id: 'eq.' + userId,
+        status: 'eq.waiting',
+        expires_at: 'lt.' + new Date().toISOString(),
+      });
+      const cleanup = await fetcher(url + '/rest/v1/quiz_rooms?' + expired, {
+        method: 'PATCH',
+        headers: {
+          apikey: key,
+          Authorization: 'Bearer ' + jwt,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ status: 'closed' }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!cleanup.ok) return res.status(502).json({ error: 'rooms_unavailable_or_migration_required' });
+
+      for (let retry = 0; retry < 5; retry++) {
+        const pin = String(crypto.randomInt(100000, 1000000));
+        const response = await fetcher(url + '/rest/v1/quiz_rooms?select=' +
+          encodeURIComponent('id,quiz_id,pin,status,created_at,expires_at'), {
+          method: 'POST',
+          headers: requestHeaders(req.cloud),
+          body: JSON.stringify({
+            owner_id: userId, quiz_id: quiz.id, pin, status: 'waiting',
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+        const body = await readJson(response);
+        if (response.ok && Array.isArray(body) && body[0])
+          return res.status(201).json(body[0]);
+        if (response.status === 409 && body?.code === '23505') {
+          const detail = String(body.details || '') + String(body.message || '');
+          if (detail.includes('quiz_rooms_one_waiting_per_quiz'))
+            return res.status(409).json({ error: 'quiz_room_already_open' });
+          // Colisión de PIN excepcional: generar otro, no usar un PIN secuencial.
+          continue;
+        }
+        return res.status(502).json({ error: 'room_create_failed' });
+      }
+      return res.status(503).json({ error: 'room_pin_exhausted' });
+    } catch {
+      return res.status(502).json({ error: 'rooms_unavailable_or_migration_required' });
+    }
+  });
+
+  router.post('/rooms/:id/close', async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
+    const { url, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id,
+      owner_id: 'eq.' + userId,
+      status: 'eq.waiting',
+      select: 'id,quiz_id,pin,status,expires_at',
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_rooms?' + params, {
+        method: 'PATCH',
+        headers: requestHeaders(req.cloud),
+        body: JSON.stringify({ status: 'closed' }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const rows = await readJson(response);
+      if (!response.ok || !Array.isArray(rows))
+        return res.status(502).json({ error: 'room_close_failed' });
+      if (!rows.length) return res.status(404).json({ error: 'room_not_found' });
+      return res.json(rows[0]);
+    } catch {
+      return res.status(502).json({ error: 'room_close_failed' });
     }
   });
 
