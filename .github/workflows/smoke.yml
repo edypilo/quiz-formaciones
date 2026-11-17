@@ -15,4 +15,4 @@ jobs:
       - run: npm ci --omit=optional --no-audit --no-fund
       - run: node --check server.js
       - run: node --check iniciar.js
-      - run: node --test tests/server-runtime.test.js
+      - run: node --test tests/*.test.js
