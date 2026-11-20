@@ -226,3 +226,40 @@ test('Realtime: presentador mantiene fallback y no inserta JWT en URL WebSocket'
   assert.match(js,/!live\?\.isLive\(\)/);
   assert.match(html,/cloud-realtime-host\.js/);
 });
+
+test('Realtime invitado: tema opaco, aviso mínimo y RPC protegida con token',()=>{
+  const sql=fs.readFileSync(path.join(__dirname,'../supabase/migrations/202611200006_quiz_realtime_guests.sql'),'utf8');
+  assert.match(sql,/create or replace function public\.quiz_guest_stream\(p_token uuid\)/);
+  assert.match(sql,/p\.token_digest = extensions\.digest\(p_token::text, 'sha256'\)/);
+  assert.match(sql,/v_status <> 'waiting' or v_expires <= now\(\)/);
+  assert.match(sql,/encode\(extensions\.digest\(v_secret::text \|\| ':guest-events:v1','sha256'\),'hex'\)/);
+  assert.match(sql,/jsonb_build_object\('kind','phase'\)/);
+  assert.match(sql,/jsonb_build_object\('kind','participant'\)/);
+  assert.match(sql,/after update of game_phase, game_question_index, status, is_joinable/);
+  assert.match(sql,/after insert or delete on public\.quiz_room_players/);
+  assert.doesNotMatch(sql,/jsonb_build_object\('kind','answer'\)/);
+  assert.doesNotMatch(sql,/jsonb_build_object\('nickname'/);
+  assert.doesNotMatch(sql,/grant select on public\.quiz_room/);
+  assert.equal((sql.match(/\$\$/g)||[]).length,6);
+  assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+});
+test('Realtime invitado: WebSocket no revela token y conserva consultas de respaldo',()=>{
+  const client=fs.readFileSync(path.join(__dirname,'../cloud/realtime-guest.js'),'utf8');
+  const join=fs.readFileSync(path.join(__dirname,'../cloud/join.js'),'utf8');
+  const html=fs.readFileSync(path.join(__dirname,'../cloud/join.html'),'utf8');
+  assert.match(client,/rpc\('quiz_guest_stream', \{ p_token: playerToken \}\)/);
+  assert.match(client,/^.{0,300}private: false/m);
+  assert.match(client,/topic = 'realtime:' \+ result\.topic/);
+  assert.match(client,/new WebSocket\(url\)/);
+  assert.match(client,/setInterval\(\(\) => send\('heartbeat'/);
+  assert.match(client,/schedule\(\)/);
+  assert.doesNotMatch(client,/encodeURIComponent\(playerToken\)/);
+  assert.doesNotMatch(client,/access_token: playerToken/);
+  assert.match(join,/realtime\.start\(token\)/);
+  assert.match(join,/realtime\?\.stop\(\)/);
+  assert.match(join,/checkBusy/);
+  assert.match(join,/checkAgain/);
+  assert.match(join,/!realtime\?\.isLive\(\)/);
+  assert.match(html,/cloud-realtime-guest\.js/);
+  assert.match(html,/id="guest-connection-mode"/);
+});
