@@ -131,9 +131,10 @@ grant execute on function public.quiz_guest_join(text, uuid, text) to anon, auth
 create or replace function public.quiz_guest_status(p_token uuid)
 returns jsonb language plpgsql security definer set search_path = ''
 as $$
-declare v_room public.quiz_rooms%rowtype; v_nickname text; v_count integer;
+declare v_pin text; v_status text; v_expires timestamptz; v_nickname text; v_count integer;
 begin
-  select r, p.nickname into v_room, v_nickname
+  select r.pin, r.status, r.expires_at, p.nickname
+    into v_pin, v_status, v_expires, v_nickname
     from public.quiz_room_players p
     join public.quiz_rooms r on r.id = p.room_id
    where p.token_digest = extensions.digest(p_token::text, 'sha256');
@@ -141,11 +142,13 @@ begin
     return jsonb_build_object('ok', false, 'error', 'session_not_found');
   end if;
   select count(*) into v_count
-    from public.quiz_room_players where room_id = v_room.id;
-  return jsonb_build_object('ok', true, 'pin', v_room.pin,
+    from public.quiz_room_players p
+    join public.quiz_rooms r on r.id = p.room_id
+    where r.pin = v_pin and r.expires_at = v_expires;
+  return jsonb_build_object('ok', true, 'pin', v_pin,
     'nickname', v_nickname,
-    'room_status', case when v_room.status = 'waiting' and
-      v_room.expires_at > now() then 'waiting' else 'closed' end,
+    'room_status', case when v_status = 'waiting' and
+      v_expires > now() then 'waiting' else 'closed' end,
     'player_count', v_count);
 end;
 $$;
