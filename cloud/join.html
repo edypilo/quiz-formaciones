@@ -11,13 +11,18 @@ button{font:inherit;border:0;background:#315cce;color:white;font-weight:750;bord
 button:disabled{opacity:.65;cursor:wait}.full{width:100%;margin-top:25px}.hint{color:#586d88;line-height:1.5}
 .status{min-height:1.5rem;margin:20px 0 0;color:#526886}.status[data-type=error]{color:#a22035}.status[data-type=success]{color:#217347}
 [hidden]{display:none!important}.wait{text-align:center}.count{font-size:28px;font-weight:800}
-</style><script defer src="/join.js"></script></head><body>
+.random-name{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px;background:#f2f6ff;border:1px solid #dbe5f5;border-radius:12px}.name-display{font-size:1.15rem;font-weight:800;flex:1;min-width:160px}.random-name button{font-size:.89rem;padding:10px 12px}.random-name button:disabled{opacity:.55}
+</style><script defer src="/cloud-names.js"></script><script defer src="/join.js"></script></head><body>
 <main><div class="logo">Quizzz<span>!!!</span></div>
 <section id="join-section" class="card"><h1>¡Entra a jugar!</h1>
 <p class="hint">Acceso de prueba mediante invitación del formador. Las preguntas todavía no están habilitadas.</p>
 <form id="join-form">
+<p id="qr-instructions" class="hint" hidden>Has llegado escaneando el QR. ¡Tu PIN ya está preparado!</p>
 <label for="pin">PIN de la sala</label><input id="pin" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" required placeholder="123456">
-<label for="nickname">Tu nombre de jugador</label><input id="nickname" maxlength="32" minlength="2" autocomplete="nickname" required placeholder="¿Cómo quieres llamarte?">
+<label for="nickname">Tu nombre de jugador</label>
+<div class="random-name"><span class="name-display" id="name-display" aria-live="polite">Preparando nombre…</span><button type="button" id="shuffle-name" aria-label="Generar otro nombre divertido" title="Quiero otro nombre"> <span aria-hidden="true">🎲</span> Otro nombre</button></div>
+<input id="nickname" maxlength="32" minlength="2" readonly hidden required>
+<p class="hint">Cada jugador recibe un nombre aleatorio. Puedes cambiarlo pulsando el dado.</p>
 <button id="join-button" type="submit" class="full">Entrar en la sala</button></form>
 <p id="join-status" class="status" aria-live="polite" role="status"></p></section>
 <section id="waiting-section" class="card wait" hidden>
