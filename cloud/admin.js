@@ -286,7 +286,8 @@
           const showQr = document.createElement('button');
           showQr.type = 'button'; showQr.className = 'minor';
           showQr.textContent = 'Mostrar QR';
-          showQr.addEventListener('click', () => void showRoomQr(room, url.href));
+          showQr.textContent = 'Abrir presentación y QR';
+          showQr.addEventListener('click', () => openPresenter(room));
           controls.append(showQr);
           const invite = document.createElement('button');
           invite.type = 'button'; invite.className = 'minor';
@@ -458,6 +459,32 @@
   }
   $('room-qr-close').addEventListener('click', hideRoomQr);
   $('room-qr-dialog').addEventListener('close', hideRoomQr);
+  const presenterWindows = new Map();
+  window.addEventListener('message', async (event) => {
+    if (event.origin !== window.location.origin ||
+      event.data?.type !== 'quizzz:presenter-auth-request') return;
+    const { roomId, nonce } = event.data;
+    if (typeof nonce !== 'string' || nonce.length > 100 ||
+      presenterWindows.get(roomId) !== event.source) return;
+    if (!(await refreshAccess())) return;
+    if (presenterWindows.get(roomId) !== event.source) return;
+    event.source.postMessage({
+      type: 'quizzz:presenter-auth', roomId, nonce, token: accessToken,
+    }, window.location.origin);
+  });
+  function openPresenter(room) {
+    const url = new URL('/presenter', window.location.origin);
+    url.searchParams.set('room', room.id);
+    // Debe abrirse directamente desde el click para evitar bloqueadores.
+    const win = window.open(url.href, 'quizzz-presenter-' + room.id, 'width=1440,height=900');
+    if (!win) {
+      roomMessage('El navegador ha bloqueado la ventana. Permite las ventanas emergentes de este Preview.', 'error');
+      return;
+    }
+    presenterWindows.set(room.id, win);
+    win.focus();
+    roomMessage('Pantalla de presentación abierta. El QR y toda la partida se mostrarán allí.', 'success');
+  }
   async function showRoomQr(room, joinUrl) {
     if (!(await refreshAccess())) {
       closeSession();
