@@ -30,6 +30,32 @@
   let answerSubmitting = false;
   let deadline = 0;
   let lastGamePhase = '';
+  let feedbackCompletedKey = '';
+  let feedbackPendingKey = '';
+  let feedbackSequence = 0;
+  let presenceConfirmedKey = '';
+  const encouragements = Object.freeze([
+    '¡Casi! La próxima puede ser la tuya.',
+    '¡Sigue jugando, que aún queda partida!',
+    '¡Buen intento! A por la siguiente.',
+    '¡Ni los mejores aciertan siempre!',
+    '¡Cada pregunta es una nueva oportunidad!',
+    '¡No te rindas! La remontada empieza ahora.',
+  ]);
+  const positiveMessages = Object.freeze([
+    '¡Tu cerebro está en modo turbo!',
+    '¡Respuesta brillante! Sigue así.',
+    '¡Lo has clavado!',
+    '¡Menuda jugada! A por la siguiente.',
+    '¡Imparable! Has dado en el blanco.',
+  ]);
+  const absentMessages = Object.freeze([
+    '¿Sigues ahí? ¡Te esperamos en la próxima!',
+    '¡Eh, explorador! ¿Todo bien por ahí?',
+    'No pasa nada, ¡todavía puedes remontar!',
+    '¿Te hemos pillado despistado? ¡Vuelve al juego!',
+  ]);
+  const choose = (values) => values[Math.floor(Math.random() * values.length)];
 
   const storageKey = 'quizzz_lobby_preview';
   const message = (id, text, type = '') => {
@@ -62,7 +88,82 @@
     $('guest-game').hidden = true;
     currentQuestionKey = '';
     lastGamePhase = '';
+    resetPersonalFeedback();
     $('join-section').hidden = false;
+  }
+
+
+  function resetPersonalFeedback() {
+    feedbackSequence++;
+    feedbackCompletedKey = '';
+    feedbackPendingKey = '';
+    presenceConfirmedKey = '';
+    $('guest-feedback').hidden = true;
+    $('guest-feedback').removeAttribute('data-outcome');
+    $('guest-feedback-present').hidden = true;
+    $('guest-feedback-next').textContent = 'Esperando la siguiente pregunta…';
+  }
+  function drawPersonalFeedback(data, key) {
+    const outcome = data.outcome;
+    if (!['correct', 'incorrect', 'unanswered', 'participated'].includes(outcome)) return false;
+    const points = Number(data.points);
+    if (!Number.isSafeInteger(points) || points < 0) return false;
+    const themes = {
+      correct: ['🎉', '¡Has acertado!', choose(positiveMessages)],
+      incorrect: ['💪', '¡Buen intento!', choose(encouragements)],
+      unanswered: ['👀', '¿Sigues ahí?', choose(absentMessages)],
+      participated: ['🙌', '¡Gracias por participar!', '¡Tu opinión cuenta! Vamos con la siguiente.'],
+    };
+    const [icon, title, msg] = themes[outcome];
+    $('guest-feedback-icon').textContent = icon;
+    $('guest-feedback-title').textContent = title;
+    $('guest-feedback-message').textContent = msg;
+    $('guest-feedback-points').textContent = points > 0
+      ? '+' + points.toLocaleString('es-ES') + ' puntos'
+      : outcome === 'participated' ? 'Encuesta sin puntuación' : '0 puntos en esta pregunta';
+    $('guest-feedback').dataset.outcome = outcome;
+    const presence = $('guest-feedback-present');
+    presence.hidden = outcome !== 'unanswered';
+    $('guest-feedback-next').textContent = 'Esperando la siguiente pregunta…';
+    presence.textContent = '¡Aquí sigo! 🙌';
+    $('guest-feedback').hidden = false;
+    feedbackCompletedKey = key;
+    return true;
+  }
+  $('guest-feedback-present').addEventListener('click', () => {
+    presenceConfirmedKey = feedbackCompletedKey;
+    $('guest-feedback-present').hidden = true;
+    $('guest-feedback-title').textContent = '¡Ahí estás! 🙌';
+    $('guest-feedback-message').textContent = '¡Genial! Te esperamos en la próxima pregunta.';
+  });
+  async function loadPersonalFeedback(index) {
+    const key = String(index) + ':reveal';
+    if (!token || feedbackCompletedKey === key || feedbackPendingKey === key) return;
+    feedbackPendingKey = key;
+    const sequence = ++feedbackSequence;
+    $('guest-feedback').hidden = false;
+    $('guest-feedback').dataset.outcome = 'loading';
+    $('guest-feedback-icon').textContent = '⏳';
+    $('guest-feedback-title').textContent = 'Calculando tu resultado…';
+    $('guest-feedback-message').textContent = 'Comprobando tu respuesta.';
+    $('guest-feedback-points').textContent = '';
+    $('guest-feedback-present').hidden = true;
+    try {
+      const result = await rpc('quiz_guest_feedback', { p_token: token });
+      if (sequence !== feedbackSequence || currentQuestionKey !== key) return;
+      if (!result?.ok || result.index !== index || !drawPersonalFeedback(result, key))
+        throw new Error('feedback_not_ready');
+    } catch {
+      if (sequence === feedbackSequence && currentQuestionKey === key) {
+        $('guest-feedback').dataset.outcome = 'loading';
+        $('guest-feedback-icon').textContent = '🔄';
+        $('guest-feedback-title').textContent = 'Consultando tu resultado…';
+        $('guest-feedback-message').textContent = 'La conexión no ha respondido. Lo intentaremos de nuevo.';
+        $('guest-feedback-points').textContent = '';
+      }
+    } finally {
+      if (feedbackPendingKey === key) feedbackPendingKey = '';
+    }
   }
 
   function renderGame(state) {
@@ -70,6 +171,7 @@
     const question = state.question;
     $('guest-game').hidden = !question || !['question', 'reveal'].includes(phase);
     if (phase === 'finished') {
+      resetPersonalFeedback();
       $('waiting-text').textContent = '¡Partida terminada! Gracias por participar.';
       return;
     }
@@ -86,8 +188,18 @@
     if (fresh) {
       currentQuestionKey = key;
       $('guest-question-options').replaceChildren();
+      resetPersonalFeedback();
     }
+    const revealing = phase === 'reveal';
+    $('guest-question-text').hidden = revealing;
+    $('guest-question-time').hidden = revealing;
+    $('guest-question-options').hidden = revealing;
+    $('guest-question-message').hidden = revealing;
     deadline = question.ends_at ? Date.parse(question.ends_at) : 0;
+    if (revealing) {
+      if (feedbackCompletedKey !== key) void loadPersonalFeedback(question.index);
+      return;
+    }
     if (fresh) {
       const answers = $('guest-question-options');
       (question.options || []).forEach((option, index) => {
