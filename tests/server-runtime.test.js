@@ -86,6 +86,9 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
     assert.match(presenterHtml, /Escanea y participa/);
     assert.match(presenterHtml, /id="responses"/);
     assert.match(presenterHtml, /id="podium-screen"/);
+    const realtimeJs = await fetch(`${base}/cloud-realtime-host.js`);
+    assert.equal(realtimeJs.status, 200);
+    assert.match(await realtimeJs.text(), /realtime\/v1\/websocket/);
     const presenterJs = await fetch(`${base}/presenter.js`);
     assert.equal(presenterJs.status, 200);
     assert.match(await presenterJs.text(), /quizzz:presenter-auth-request/);
