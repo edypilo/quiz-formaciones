@@ -126,6 +126,7 @@ returns jsonb language plpgsql security definer set search_path = ''
 as $$
 declare
   v_room public.quiz_rooms%rowtype;
+  v_room_id uuid;
   v_player uuid;
   v_question jsonb;
   v_options jsonb;
@@ -140,12 +141,11 @@ begin
      or jsonb_array_length(p_selected) <> 1 then
     return jsonb_build_object('ok',false,'error','invalid_answer');
   end if;
-  select p.id, r.id into v_player, v_room.id
+  select p.id, p.room_id into v_player, v_room_id
     from public.quiz_room_players p
-    join public.quiz_rooms r on r.id = p.room_id
    where p.token_digest = extensions.digest(p_token::text, 'sha256');
   if not found then return jsonb_build_object('ok',false,'error','invalid_session'); end if;
-  select * into v_room from public.quiz_rooms where id = v_room.id;
+  select * into v_room from public.quiz_rooms where id = v_room_id;
   if v_room.status <> 'waiting' or v_room.expires_at <= now()
      or v_room.game_phase <> 'question' or clock_timestamp() >= v_room.question_ends_at then
     return jsonb_build_object('ok',false,'error','question_closed');
@@ -194,10 +194,13 @@ declare
   v_answered boolean := false;
   v_phase text;
 begin
-  select r.*, p.id, p.nickname into v_room, v_player, v_nickname
+  select r.id, p.id, p.nickname into v_room.id, v_player, v_nickname
     from public.quiz_room_players p
     join public.quiz_rooms r on r.id = p.room_id
     where p.token_digest = extensions.digest(p_token::text, 'sha256');
+  if found then
+    select * into v_room from public.quiz_rooms where id = v_room.id;
+  end if;
   if not found then return jsonb_build_object('ok',false,'error','session_not_found'); end if;
   select count(*) into v_count from public.quiz_room_players where room_id = v_room.id;
   v_phase := v_room.game_phase;
