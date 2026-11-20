@@ -282,3 +282,33 @@ test('presentador: recursos privados solo con JWT del formador y YouTube con hos
   assert.match(server,/frame-src https:\/\/www\.youtube-nocookie\.com/);
   assert.doesNotMatch(server,/storage\/v1\/object\/public\/quiz-media/);
 });
+
+test('quiz con varias opciones correctas: SQL valida conjunto exacto y no revela claves antes de tiempo',()=>{
+  const sql=fs.readFileSync(path.join(__dirname,
+    '../supabase/migrations/202611200008_quiz_multi_answer.sql'),'utf8');
+  assert.equal((sql.match(/create or replace function public\./g)||[]).length,4);
+  assert.equal((sql.match(/\$\$/g)||[]).length,8);
+  assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+  assert.match(sql,/jsonb_array_length\(p_selected\) > 4/);
+  assert.match(sql,/v_n = any\(v_seen\)/);
+  assert.match(sql,/jsonb_agg\(x order by x\)/);
+  assert.match(sql,/v_selected = v_correct/);
+  assert.match(sql,/game_question_index,v_selected,v_score/);
+  assert.match(sql,/case when v_question->>'type'='quiz'/);
+  assert.match(sql,/then jsonb_array_length\(v_question->'correct'\)>1 else false end/);
+  assert.match(sql,/grant execute on function public.quiz_guest_answer/);
+  assert.match(sql,/grant execute on function public.quiz_guest_status/);
+});
+test('móvil permite multiselección sin envío hasta pulsar confirmar',()=>{
+  const js=fs.readFileSync(path.join(__dirname,'../cloud/join.js'),'utf8');
+  const html=fs.readFileSync(path.join(__dirname,'../cloud/join.html'),'utf8');
+  const presenter=fs.readFileSync(path.join(__dirname,'../cloud/presenter.js'),'utf8');
+  assert.match(js,/multipleSelected = new Set\(\)/);
+  assert.match(js,/question.multiple === true/);
+  assert.match(js,/void submitAnswer\(\[\.\.\.multipleSelected\].sort/);
+  assert.match(js,/p_selected: selectedIndexes/);
+  assert.match(js,/button.classList.toggle\('selected', multipleSelected.has\(index\)\)/);
+  assert.match(html,/id="guest-multiple-submit"/);
+  assert.match(html,/id="guest-multiple-hint"/);
+  assert.match(presenter,/s.question\?\.multiple/);
+});
