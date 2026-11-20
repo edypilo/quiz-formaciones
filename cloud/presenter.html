@@ -28,9 +28,9 @@ h1{font-size:clamp(28px,5.5vw,62px);line-height:1.12;margin:10px 0 18px}h2{font-
 @media(max-width:750px){.lobby{grid-template-columns:1fr}.answers{grid-template-columns:1fr}.answer{min-height:70px}.timer{width:82px;height:82px}.rank-gain{min-width:48px}.rank-score{min-width:70px}.stage{min-height:320px}.place-1 .pedestal{height:205px}.place-2 .pedestal{height:160px}.place-3 .pedestal{height:115px}}
 @media(prefers-reduced-motion:reduce){.rank-row{transition:none!important}.place.show .pedestal,.place.show .place-name,.place.show .place-score{transition:none}.place.show .avatar{animation:none;opacity:1}}
 </style>
-<script src="/cloud-names.js" defer></script><script src="/cloud-effects.js" defer></script><script src="/presenter.js" defer></script>
+<script src="/cloud-names.js" defer></script><script src="/cloud-effects.js" defer></script><script src="/cloud-realtime-host.js" defer></script><script src="/presenter.js" defer></script>
 </head><body>
-<header><div class="brand">Quizzz<span>!!!</span></div><div class="controls"><strong id="room-title">Preparando sala</strong><button id="fullscreen" type="button">⛶ Pantalla completa</button></div></header>
+<header><div class="brand">Quizzz<span>!!!</span></div><div class="controls"><span id="connection-mode" class="muted" role="status" aria-live="polite">Conectando…</span><strong id="room-title">Preparando sala</strong><button id="fullscreen" type="button">⛶ Pantalla completa</button></div></header>
 <main>
 <p id="status" class="status" role="status" aria-live="polite">Conectando con el panel del formador…</p>
 <section id="lobby" class="screen" hidden>
