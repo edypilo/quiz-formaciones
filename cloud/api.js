@@ -721,6 +721,63 @@ function makeRouter(fetcher = fetch) {
     }
   });
 
+
+  // Los cambios de fase se efectúan en Postgres, nunca en memoria de Vercel.
+  function hostGameCommand(rpc) {
+    return async (req, res) => {
+      if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
+      const { url, key, jwt } = req.cloud;
+      try {
+        const result = await fetcher(url + '/rest/v1/rpc/' + rpc, {
+          method: 'POST',
+          headers: { apikey: key, Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_room_id: req.params.id }),
+          signal: AbortSignal.timeout(8000),
+        });
+        const data = await readJson(result);
+        if (!result.ok || !data || typeof data !== 'object')
+          return res.status(502).json({ error: 'game_unavailable_or_migration_required' });
+        return res.status(data.ok ? 200 : 409).json(data);
+      } catch {
+        return res.status(502).json({ error: 'game_unavailable_or_migration_required' });
+      }
+    };
+  }
+  router.post('/rooms/:id/start', hostGameCommand('quiz_host_start_game'));
+  router.post('/rooms/:id/advance', hostGameCommand('quiz_host_advance_game'));
+  router.post('/rooms/:id/scores', hostGameCommand('quiz_host_game_scores'));
+
+  router.get('/rooms/:id/game', async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
+    const { url, key, jwt, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id, owner_id: 'eq.' + userId,
+      select: 'id,game_phase,game_question_index,game_questions,question_ends_at',
+      limit: '1',
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_rooms?' + params, {
+        headers: { apikey: key, Authorization: 'Bearer ' + jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const rows = await readJson(response);
+      if (!response.ok || !Array.isArray(rows)) return res.status(502).json({ error: 'game_query_failed' });
+      if (!rows.length) return res.status(404).json({ error: 'room_not_found' });
+      const r = rows[0];
+      const q = ['question','reveal'].includes(r.game_phase)
+        ? r.game_questions?.[r.game_question_index] : null;
+      return res.json({
+        phase: r.game_phase, index: r.game_question_index,
+        count: Array.isArray(r.game_questions) ? r.game_questions.length : 0,
+        ends_at: r.question_ends_at,
+        question: q ? { text: q.text, type: q.type, options: q.options,
+                        correct: r.game_phase === 'reveal' ? q.correct : null } : null,
+      });
+    } catch {
+      return res.status(502).json({ error: 'game_query_failed' });
+    }
+  });
+
   router.post('/rooms/:id/close', async (req, res) => {
     if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
     const { url, userId } = req.cloud;
