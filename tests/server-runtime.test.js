@@ -78,6 +78,7 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
     const csp = cloudAdmin.headers.get('content-security-policy');
     assert.match(csp, /img-src 'self' blob:/);
     assert.match(csp, /media-src 'self' blob:/);
+    assert.match(csp, /wss:\/\/\*\.supabase\.co/);
     assert.doesNotMatch(csp, /img-src[^;]*https:\/\//);
     assert.doesNotMatch(csp, /media-src[^;]*https:\/\//);
     const presenterPage = await fetch(`${base}/presenter?room=d5f47ca1-a416-43a3-8341-6dffca530f3f`);
