@@ -85,7 +85,7 @@
     $('welcome').textContent = 'Jugador: ' + nickname;
     clearPolling();
     void checkRoom();
-    polling = setInterval(() => void checkRoom(), 5000);
+    polling = setInterval(() => void checkRoom(), 3000);
   }
   $('join-form').addEventListener('submit', async (event) => {
     event.preventDefault();
