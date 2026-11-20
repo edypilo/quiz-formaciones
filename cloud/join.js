@@ -47,6 +47,12 @@
   }
   let currentQuestionKey = '';
   let answerSubmitting = false;
+  let multipleSelected = new Set();
+  let multipleMode = false;
+  $('guest-multiple-submit').addEventListener('click', () => {
+    if (!multipleMode || !multipleSelected.size) return;
+    void submitAnswer([...multipleSelected].sort((a,b)=>a-b));
+  });
   let deadline = 0;
   let lastGamePhase = '';
   let feedbackCompletedKey = '';
@@ -346,6 +352,8 @@
     const fresh = currentQuestionKey !== key;
     if (fresh) {
       currentQuestionKey = key;
+      multipleSelected = new Set();
+      multipleMode = phase === 'question' && question.multiple === true;
       $('guest-question-options').replaceChildren();
       resetPersonalFeedback();
       clearPrivateMedia();
@@ -354,6 +362,11 @@
       if (phase === 'question') void loadPrivateMedia(question.media, question.index);
     }
     const revealing = phase === 'reveal';
+    $('guest-multiple-hint').hidden = revealing || !multipleMode;
+    $('guest-multiple-submit').hidden = revealing || !multipleMode;
+    $('guest-multiple-submit').disabled = revealing || !multipleSelected.size || answerSubmitting || state.answered;
+    $('guest-multiple-submit').textContent = multipleSelected.size
+      ? 'Enviar ' + multipleSelected.size + (multipleSelected.size === 1 ? ' respuesta ✓' : ' respuestas ✓') : 'Selecciona tus respuestas';
     $('guest-question-text').hidden = revealing;
     $('guest-media').hidden = revealing || !$('guest-media').hasChildNodes();
     if (revealing) clearPrivateMedia();
@@ -381,7 +394,16 @@
         button.append(shape, content);
         if (phase === 'reveal' && question.correct?.includes(index)) button.classList.add('correct');
         if (phase !== 'question' || state.answered) button.disabled = true;
-        button.addEventListener('click', () => void submitAnswer(index));
+        button.addEventListener('click', () => {
+          if (!multipleMode) { void submitAnswer([index]); return; }
+          if (multipleSelected.has(index)) multipleSelected.delete(index);
+          else multipleSelected.add(index);
+          button.classList.toggle('selected', multipleSelected.has(index));
+          $('guest-multiple-submit').disabled = !multipleSelected.size;
+          $('guest-multiple-submit').textContent = multipleSelected.size
+            ? 'Enviar ' + multipleSelected.size + (multipleSelected.size === 1 ? ' respuesta ✓' : ' respuestas ✓')
+            : 'Selecciona tus respuestas';
+        });
         answers.append(button);
       });
     }
@@ -389,7 +411,7 @@
         (!deadline || Date.now() < deadline)) {
       $('guest-question-options').querySelectorAll('button').forEach(button => {
         button.disabled = false;
-        button.classList.remove('selected');
+        if (!multipleMode) button.classList.remove('selected');
       });
     }
     if (state.answered) {
@@ -414,21 +436,26 @@
     $('guest-question-time').textContent = 'Tiempo restante: ' + remaining + ' s';
     if (remaining === 0) {
       $('guest-question-options').querySelectorAll('button').forEach(button => { button.disabled = true; });
+      $('guest-multiple-submit').disabled = true;
       if (!answerSubmitting) message('guest-question-message', 'Se ha agotado el tiempo.');
     }
   }
-  async function submitAnswer(index) {
-    if (!token || answerSubmitting || !currentQuestionKey.endsWith(':question') ||
+  async function submitAnswer(selectedIndexes) {
+    if (!Array.isArray(selectedIndexes) || !selectedIndexes.length ||
+        selectedIndexes.length > 4 ||
+        selectedIndexes.some(i => !Number.isInteger(i) || i < 0 || i > 3) ||
+        !token || answerSubmitting || !currentQuestionKey.endsWith(':question') ||
         (deadline && Date.now() >= deadline)) return;
     answerSubmitting = true;
     const buttons = $('guest-question-options').querySelectorAll('button');
     buttons.forEach(button => { button.disabled = true; });
-    const selected = Array.from(buttons).find(button => Number(button.dataset.index) === index);
-    if (selected) selected.classList.add('selected');
+    buttons.forEach(button => button.classList.toggle('selected',
+      selectedIndexes.includes(Number(button.dataset.index))));
+    $('guest-multiple-submit').disabled = true;
     message('guest-question-message', 'Enviando respuesta…');
     try {
       const response = await rpc('quiz_guest_answer', {
-        p_token: token, p_selected: [index],
+        p_token: token, p_selected: selectedIndexes,
       });
       if (!response?.ok) {
         message('guest-question-message', response?.error === 'already_answered'
