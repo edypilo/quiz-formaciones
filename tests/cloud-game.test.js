@@ -83,6 +83,13 @@ test('migración de motor mantiene funciones separadas, índices únicos y respu
   assert.match(sql,/clock_timestamp\(\) >= v_room\.question_ends_at/);
   assert.match(sql,/case when v_phase = 'reveal'/);
   assert.match(sql,/revoke all on public\.quiz_room_answers from anon, authenticated/);
+  assert.match(sql,/\(p_selected->>0\) !~ '\^\[0-9\]\{1,2\}\
+  assert.equal((sql.match(/create or replace function public\.quiz_guest_status/g)||[]).length,1);
+  assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+});
+ then/);
+  assert.equal((sql.match(/\\$\\$/g)||[]).length,10);
+  assert.doesNotMatch(sql,/\[0-9\]\{1,2\}\s*\\n\s*return/);
   assert.equal((sql.match(/create or replace function public\.quiz_guest_status/g)||[]).length,1);
   assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
 });
