@@ -26,6 +26,11 @@
   let token = '';
   let nickname = '';
   let polling = null;
+  let currentQuestionKey = '';
+  let answerSubmitting = false;
+  let deadline = 0;
+  let lastGamePhase = '';
+
   const storageKey = 'quizzz_lobby_preview';
   const message = (id, text, type = '') => {
     const node = $(id);
@@ -54,8 +59,100 @@
     nickname = '';
     sessionStorage.removeItem(storageKey);
     $('waiting-section').hidden = true;
+    $('guest-game').hidden = true;
+    currentQuestionKey = '';
+    lastGamePhase = '';
     $('join-section').hidden = false;
   }
+
+  function renderGame(state) {
+    const phase = state.game_phase || 'lobby';
+    const question = state.question;
+    $('guest-game').hidden = !question || !['question', 'reveal'].includes(phase);
+    if (phase === 'finished') {
+      $('waiting-text').textContent = '¡Partida terminada! Gracias por participar.';
+      return;
+    }
+    if (!question) {
+      if (phase === 'lobby') $('waiting-text').textContent = 'Esperando al formador…';
+      return;
+    }
+    $('waiting-text').textContent = phase === 'question'
+      ? '¡Elige una respuesta!' : 'Resultado de la pregunta';
+    $('guest-question-step').textContent = 'Pregunta ' + (question.index + 1) + ' de ' + question.count;
+    $('guest-question-text').textContent = question.text;
+    const key = question.index + ':' + phase;
+    const fresh = currentQuestionKey !== key;
+    if (fresh) {
+      currentQuestionKey = key;
+      $('guest-question-options').replaceChildren();
+    }
+    deadline = question.ends_at ? Date.parse(question.ends_at) : 0;
+    if (fresh) {
+      const answers = $('guest-question-options');
+      (question.options || []).forEach((option, index) => {
+        if (!option) return;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = (index + 1) + '. ' + option;
+        if (phase === 'reveal' && question.correct?.includes(index)) button.classList.add('correct');
+        if (phase !== 'question' || state.answered) button.disabled = true;
+        button.addEventListener('click', () => void submitAnswer(index));
+        answers.append(button);
+      });
+    }
+    if (state.answered) {
+      $('guest-question-options').querySelectorAll('button').forEach(button => { button.disabled = true; });
+      message('guest-question-message', phase === 'question'
+        ? 'Respuesta recibida. Esperando al resto…'
+        : '¡Pregunta terminada!', 'success');
+    } else if (phase === 'reveal') {
+      message('guest-question-message', 'Estas eran las respuestas correctas.', 'success');
+    } else if (fresh) {
+      message('guest-question-message', '');
+    }
+    updateCountdown();
+  }
+  function updateCountdown() {
+    if ($('guest-game').hidden) return;
+    if (!currentQuestionKey.endsWith(':question')) {
+      $('guest-question-time').textContent = 'Resultado mostrado por el formador.';
+      return;
+    }
+    const remaining = deadline ? Math.max(0, Math.ceil((deadline - Date.now()) / 1000)) : 0;
+    $('guest-question-time').textContent = 'Tiempo restante: ' + remaining + ' s';
+    if (remaining === 0) {
+      $('guest-question-options').querySelectorAll('button').forEach(button => { button.disabled = true; });
+      if (!answerSubmitting) message('guest-question-message', 'Se ha agotado el tiempo.');
+    }
+  }
+  async function submitAnswer(index) {
+    if (!token || answerSubmitting || !currentQuestionKey.endsWith(':question') ||
+        (deadline && Date.now() >= deadline)) return;
+    answerSubmitting = true;
+    const buttons = $('guest-question-options').querySelectorAll('button');
+    buttons.forEach(button => { button.disabled = true; });
+    if (buttons[index]) buttons[index].classList.add('selected');
+    message('guest-question-message', 'Enviando respuesta…');
+    try {
+      const response = await rpc('quiz_guest_answer', {
+        p_token: token, p_selected: [index],
+      });
+      if (!response?.ok) {
+        message('guest-question-message', response?.error === 'already_answered'
+          ? 'La respuesta ya se había registrado.'
+          : 'No se pudo registrar la respuesta. Comprueba si el tiempo ha terminado.', 'error');
+      } else {
+        message('guest-question-message', '¡Respuesta registrada!', 'success');
+      }
+      void checkRoom();
+    } catch {
+      message('guest-question-message', 'Error de conexión. Comprueba el estado de la pregunta.', 'error');
+      void checkRoom();
+    } finally { answerSubmitting = false; }
+  }
+  setInterval(updateCountdown, 500);
+
   async function checkRoom() {
     if (!token) return;
     try {
@@ -67,6 +164,7 @@
       }
       $('welcome').textContent = 'Jugador: ' + result.nickname + ' · PIN ' + result.pin;
       $('participant-count').textContent = String(result.player_count) + ' participante(s)';
+      renderGame(result);
       if (result.room_status === 'closed') {
         clearPolling();
         $('waiting-text').textContent = 'La sala ha cerrado.';
