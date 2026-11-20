@@ -14,6 +14,7 @@ button:disabled{opacity:.65;cursor:wait}.full{width:100%;margin-top:25px}.hint{c
 .guest-choices button.c0{background:#e0374b}.guest-choices button.c1{background:#226cd3}.guest-choices button.c2{background:#c38b08}.guest-choices button.c3{background:#289046}
 .guest-choices button .shape{font-size:1.45em;min-width:1.6em;text-align:center}
 .guest-choices button.selected{outline:4px solid #13264c;filter:saturate(1.25)}
+#guest-multiple-submit{margin:10px 0 18px;font-size:1.12rem}#guest-multiple-submit:disabled{opacity:.6}#guest-multiple-hint{font-weight:700}
 .guest-choices button:disabled{opacity:.72}
 .guest-choices button.correct{outline:4px solid #16b96c;opacity:1}.feedback-panel{margin:22px 0 12px;padding:28px 15px;border-radius:22px;background:#edf5ff;border:2px solid #b8cff3;text-align:center;animation:feedback-enter .35s ease-out}.feedback-panel[data-outcome=correct]{background:#e6f8ed;border-color:#7bd5a1}.feedback-panel[data-outcome=incorrect]{background:#fff4e8;border-color:#f5c88b}.feedback-panel[data-outcome=unanswered]{background:#f3f0ff;border-color:#c6b8f5}.feedback-panel[data-outcome=participated]{background:#e9f5ff;border-color:#a6d9f5}.feedback-icon{font-size:3.6rem;line-height:1.2;margin-bottom:12px}.feedback-panel h2{font-size:clamp(25px,6vw,36px);margin:8px 0;color:#17356a}.feedback-message{font-size:1.06rem;line-height:1.55;margin:12px auto;max-width:35ch}.feedback-points{font-size:clamp(25px,7vw,40px);font-weight:900;color:#237348;margin:16px 0}.feedback-panel[data-outcome=incorrect] .feedback-points,.feedback-panel[data-outcome=unanswered] .feedback-points{color:#666b80}.feedback-panel #guest-feedback-present{margin:12px 0 6px}@keyframes feedback-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@media(prefers-reduced-motion:reduce){.feedback-panel{animation:none}}.status{min-height:1.5rem;margin:20px 0 0;color:#526886}.status[data-type=error]{color:#a22035}.status[data-type=success]{color:#217347}
 [hidden]{display:none!important}.wait{text-align:center}.count{font-size:28px;font-weight:800}
@@ -37,7 +38,9 @@ button:disabled{opacity:.65;cursor:wait}.full{width:100%;margin-top:25px}.hint{c
 <section id="guest-game" hidden aria-label="Pregunta de la partida">
 <p id="guest-question-step" class="hint"></p><h2 id="guest-question-text"></h2>
 <p id="guest-question-time" class="hint"></p><div id="guest-private-media" class="guest-private-media" hidden aria-label="Multimedia de la pregunta"></div><p id="guest-private-media-status" class="hint" hidden></p><p id="guest-media" class="hint" hidden></p>
+<p id="guest-multiple-hint" class="hint" hidden>Selecciona todas las respuestas correctas y confirma.</p>
 <div id="guest-question-options" class="guest-choices"></div>
+<button id="guest-multiple-submit" type="button" class="full" hidden disabled>Enviar respuestas ✓</button>
 <p id="guest-question-message" class="status" role="status" aria-live="polite"></p>
 <section id="guest-feedback" class="feedback-panel" hidden aria-live="polite" aria-label="Tu resultado de la pregunta">
   <div id="guest-feedback-icon" class="feedback-icon" aria-hidden="true"></div>
