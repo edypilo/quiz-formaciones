@@ -89,6 +89,17 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
     const guestScript = await fetch(`${base}/join.js`);
     assert.equal(guestScript.status, 200);
     assert.match(await guestScript.text(), /quiz_guest_join/);
+    const effectsScript = await fetch(`${base}/cloud-effects.js`);
+    assert.equal(effectsScript.status, 200);
+    assert.match(await effectsScript.text(), /function confetti/);
+    const presentationScript = await fetch(`${base}/cloud-presentation.js`);
+    assert.equal(presentationScript.status, 200);
+    assert.match(await presentationScript.text(), /openPodium/);
+    const adminMarkup = await fetch(`${base}/cloud-admin`);
+    const adminHtml = await adminMarkup.text();
+    assert.match(adminHtml, /id="game-presentation-dialog"/);
+    assert.match(adminHtml, /id="game-host-ranking"/);
+    assert.match(adminHtml, /id="game-host-podium"/);
     const adminScript = await fetch(`${base}/cloud-admin.js`);
     assert.equal(adminScript.status, 200);
     assert.ok((await adminScript.text()).includes('grant_type=password'));
