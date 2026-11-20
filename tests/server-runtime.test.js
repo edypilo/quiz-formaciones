@@ -83,6 +83,9 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
     const guestPage = await fetch(`${base}/join`);
     assert.equal(guestPage.status, 200);
     assert.match(await guestPage.text(), /Entra a jugar/);
+    const nameScript = await fetch(`${base}/cloud-names.js`);
+    assert.equal(nameScript.status, 200);
+    assert.match(await nameScript.text(), /window\.QuizzzNames/);
     const guestScript = await fetch(`${base}/join.js`);
     assert.equal(guestScript.status, 200);
     assert.match(await guestScript.text(), /quiz_guest_join/);
