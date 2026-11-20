@@ -155,7 +155,7 @@ begin
   v_question := v_room.game_questions->v_room.game_question_index;
   v_options := v_question->'options';
   if jsonb_typeof(p_selected->0) <> 'number'
-      or (p_selected->>0) !~ '^[0-9]{1,2}
+      or (p_selected->>0) !~ '^[0-9]{1,2}$' then
     return jsonb_build_object('ok',false,'error','invalid_answer');
   end if;
   v_n := (p_selected->>0)::integer;
