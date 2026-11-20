@@ -47,13 +47,26 @@ const io = new Server(server);
 if (IS_CLOUD) {
   // Comprobación de despliegue sin exponer la aplicación mientras se migra.
   app.get('/', require('./cloud/landing').cloudLanding);
+  // El invitado recibe URLs firmadas de Supabase Storage. La CSP base
+  // solo permite multimedia local/blob, así que abrimos el origen de Storage
+  // exclusivamente en /join, sin ampliar la política del panel docente.
+  const guestStorageOrigin = (() => {
+    try {
+      const origin = new URL(process.env.SUPABASE_URL || '');
+      if (origin.protocol === 'https:' && !origin.port &&
+          /^[a-z0-9-]+\.supabase\.co$/i.test(origin.hostname))
+        return ' ' + origin.origin;
+    } catch {}
+    return '';
+  })();
   const sendCloudFile = (name, type) => (_req, res) => {
+    const guestMediaOrigin = name === 'join.html' ? guestStorageOrigin : '';
     res.set({
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
       'X-Robots-Tag': 'noindex, nofollow',
       'Content-Security-Policy': type === 'html'
-        ? "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' blob:; media-src 'self' blob:; frame-src https://www.youtube-nocookie.com; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'"
+        ? `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' blob:${guestMediaOrigin}; media-src 'self' blob:${guestMediaOrigin}; frame-src https://www.youtube-nocookie.com; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'`
         : "default-src 'none'",
     });
     return res.type(type).sendFile(path.join(__dirname, 'cloud', name));
