@@ -167,6 +167,10 @@
     roomPlayerCounts = new Map();
     selectedQrRoomId = '';
     hideRoomQr();
+    presenter.close();
+    presenterBaselines.clear();
+    presenterPhases.clear();
+    presenterScores.clear();
     gameHostRoomId = '';
     $('game-host').hidden = true;
     roomMessage('');
