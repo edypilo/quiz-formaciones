@@ -68,6 +68,7 @@ if (IS_CLOUD) {
   app.get('/presenter', sendCloudFile('presenter.html', 'html'));
   app.get('/presenter.js', sendCloudFile('presenter.js', 'js'));
   app.get('/cloud-realtime-host.js', sendCloudFile('realtime-host.js', 'js'));
+  app.get('/cloud-realtime-guest.js', sendCloudFile('realtime-guest.js', 'js'));
   // API cloud protegida. El resto de la app permanece deshabilitada hasta migrar salas y editor.
   app.use('/api/cloud', require('./cloud/api').makeRouter());
   io.use((_socket, next) => next(new Error('cloud_setup_required')));
