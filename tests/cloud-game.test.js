@@ -190,3 +190,38 @@ test('estado agregado exige autorización y bloqueo correcto por rol',async()=>{
     keys.forEach((key,i)=>{if(old[i]===undefined)delete process.env[key];else process.env[key]=old[i];});
   }
 });
+
+test('Realtime: notificaciones de cambios sin publicar respuestas ni secretos',()=>{
+  const sql=fs.readFileSync(path.join(__dirname,
+    '../supabase/migrations/202611200005_quiz_realtime_host.sql'),'utf8');
+  assert.match(sql,/create policy quizzz_host_receive on realtime\.messages/);
+  assert.match(sql,/realtime\.messages\.extension = 'broadcast'/);
+  assert.match(sql,/r\.owner_id = \(select auth\.uid\(\)\)/);
+  assert.match(sql,/quizzz:host:/);
+  assert.match(sql,/perform realtime\.send/);
+  assert.match(sql,/new\.room_id,'kind','answer'/);
+  assert.match(sql,/after insert on public\.quiz_room_answers/);
+  assert.match(sql,/after insert or delete on public\.quiz_room_players/);
+  assert.match(sql,/after update of game_phase, game_question_index, status, is_joinable/);
+  assert.doesNotMatch(sql,/jsonb_build_object\([^)]*selected/);
+  assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+  assert.equal((sql.match(/\$\$/g)||[]).length,6);
+});
+
+test('Realtime: presentador mantiene fallback y no inserta JWT en URL WebSocket',()=>{
+  const ws=fs.readFileSync(path.join(__dirname,'../cloud/realtime-host.js'),'utf8');
+  const js=fs.readFileSync(path.join(__dirname,'../cloud/presenter.js'),'utf8');
+  const html=fs.readFileSync(path.join(__dirname,'../cloud/presenter.html'),'utf8');
+  assert.match(ws,/private: true, broadcast:/);
+  assert.match(ws,/event: 'phx_join'/);
+  assert.match(ws,/event: 'phx_join', ref: joinRef/);
+  assert.match(ws,/access_token: currentJwt/);
+  assert.match(ws,/send\('access_token', \{ access_token: jwt \}\)/);
+  assert.match(ws,/message\.payload\?\.payload\?\.room_id === roomId/);
+  assert.match(ws,/25000/);
+  assert.match(ws,/queueReconnect\(\)/);
+  assert.doesNotMatch(ws,/encodeURIComponent\(currentJwt\)/);
+  assert.match(js,/live\?\.setToken\(token\)/);
+  assert.match(js,/!live\?\.isLive\(\)/);
+  assert.match(html,/cloud-realtime-host\.js/);
+});
