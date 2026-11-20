@@ -38,7 +38,7 @@ async function withServer(cloud, callback) {
     cwd: path.join(__dirname, '..'),
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, PORT: String(port), QUIZ_DATA_DIR: dataDir, QUIZ_NO_BROWSER: '1',
-      ...(cloud ? { QUIZ_RUNTIME: 'cloud' } : { QUIZ_RUNTIME: 'local', VERCEL: '' }) },
+      ...(cloud ? { QUIZ_RUNTIME: 'cloud', SUPABASE_URL: 'https://example.supabase.co' } : { QUIZ_RUNTIME: 'local', VERCEL: '' }) },
   });
   let errorLog = '';
   child.stderr.on('data', (chunk) => { errorLog += chunk.toString(); });
@@ -95,6 +95,9 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
     assert.match(await presenterJs.text(), /quizzz:presenter-auth-request/);
     const guestPage = await fetch(`${base}/join`);
     assert.equal(guestPage.status, 200);
+    const guestCsp = guestPage.headers.get('content-security-policy');
+    assert.match(guestCsp, /img-src 'self' blob: https:\/\/example\.supabase\.co/);
+    assert.match(guestCsp, /media-src 'self' blob: https:\/\/example\.supabase\.co/);
     assert.match(await guestPage.text(), /Entra a jugar/);
     const nameScript = await fetch(`${base}/cloud-names.js`);
     assert.equal(nameScript.status, 200);
