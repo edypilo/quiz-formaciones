@@ -320,8 +320,13 @@
       status('Conexión interrumpida: '+String(e.message)+'. Reintentando…',true);
     } finally {busy=false;}
   }
-  // Respaldo si Realtime falla; durante la sesión confirma el estado cada 5 s.
-  setInterval(() => { if (!document.hidden) void refresh(); }, 5000);
+  // Respaldo cada segundo si se pierde Realtime; con conexión activa
+  // mantenemos una comprobación de integridad cada cinco segundos.
+  let fallbackTicks = 0;
+  setInterval(() => {
+    if (document.hidden) return;
+    if (!live?.isLive() || ++fallbackTicks % 5 === 0) void refresh();
+  }, 1000);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) void refresh();
   });
