@@ -746,6 +746,8 @@ function makeRouter(fetcher = fetch) {
   router.post('/rooms/:id/start', hostGameCommand('quiz_host_start_game'));
   router.post('/rooms/:id/advance', hostGameCommand('quiz_host_advance_game'));
   router.post('/rooms/:id/scores', hostGameCommand('quiz_host_game_scores'));
+  router.post('/rooms/:id/auto-reveal', hostGameCommand('quiz_host_reveal_due'));
+  router.post('/rooms/:id/presenter', hostGameCommand('quiz_host_presenter_state'));
 
   router.get('/rooms/:id/game', async (req, res) => {
     if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
