@@ -248,6 +248,7 @@
     $('room-title').textContent = s.quiz_title || 'Cuestionario';
     $('step').textContent = 'Pregunta ' + (s.index + 1) + ' de ' + s.count;
     $('question').textContent = s.question?.text || '';
+    if (s.question?.multiple) $('question').textContent += ' · Selecciona todas las correctas';
     void loadQuestionMedia(s.index);
     const container = $('answers');
     container.replaceChildren();
