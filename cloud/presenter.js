@@ -21,6 +21,86 @@
   let serverOffsetMs = 0;
   let qrUrl = '';
   let qrObjectUrl = '';
+  let mediaObjectUrl = '';
+  let mediaLoadSequence = 0;
+  let mediaIndex = -1;
+  function youtubeId(value) {
+    if (typeof value !== 'string' || value.length > 400) return null;
+    try {
+      const u = new URL(value);
+      if (u.protocol !== 'https:' || u.username || u.password || u.port ||
+          !['youtube.com','www.youtube.com','m.youtube.com','youtu.be','www.youtube-nocookie.com'].includes(u.hostname)) return null;
+      const id = u.hostname === 'youtu.be' ? u.pathname.slice(1) :
+        u.pathname === '/watch' ? u.searchParams.get('v') :
+        /^\/(shorts|embed|live)\/[A-Za-z0-9_-]{11}$/.test(u.pathname) ? u.pathname.split('/')[2] : '';
+      return /^[A-Za-z0-9_-]{11}$/.test(id || '') ? id : null;
+    } catch { return null; }
+  }
+  function clearMedia() {
+    mediaLoadSequence++;
+    mediaIndex = -1;
+    $('presenter-media').replaceChildren();
+    $('presenter-media').hidden = true;
+    $('presenter-media-status').hidden = true;
+    if (mediaObjectUrl) URL.revokeObjectURL(mediaObjectUrl);
+    mediaObjectUrl = '';
+  }
+  async function loadQuestionMedia(index) {
+    if (index === mediaIndex || !token) return;
+    clearMedia();
+    mediaIndex = index;
+    const seq = mediaLoadSequence;
+    try {
+      const response = await fetch('/api/cloud/rooms/' + encodeURIComponent(roomId) + '/game', {
+        headers: { Authorization: 'Bearer ' + token }, cache: 'no-store',
+      });
+      if (!response.ok) throw Error('game_media_unavailable');
+      const state = await response.json();
+      if (seq !== mediaLoadSequence || state.index !== index) return;
+      const media = state.question?.media;
+      if (!media) return;
+      const area = $('presenter-media');
+      if (media.type === 'youtube') {
+        const id = youtubeId(media.src);
+        if (!id) throw Error('invalid_youtube');
+        const frame = document.createElement('iframe');
+        frame.title = 'Vídeo de YouTube asociado a la pregunta';
+        frame.src = 'https://www.youtube-nocookie.com/embed/' + id + '?rel=0';
+        frame.referrerPolicy = 'strict-origin-when-cross-origin';
+        frame.allow = 'autoplay; encrypted-media; picture-in-picture';
+        frame.allowFullscreen = true;
+        frame.loading = 'lazy';
+        area.append(frame);
+        area.hidden = false;
+      } else if (['image','video'].includes(media.type)) {
+        if (typeof media.src !== 'string' || !/^[0-9a-f-]{36}\/assets\/[0-9a-f-]{36}\.(png|jpg|webp|gif|mp4|webm)$/i.test(media.src)) throw Error('invalid_media_path');
+        const configResponse = await fetch('/api/cloud/config', { cache: 'no-store' });
+        if (!configResponse.ok) throw Error('media_config_missing');
+        const config = await configResponse.json();
+        const url = new URL(config.supabaseUrl);
+        if (url.protocol !== 'https:' || !url.hostname.endsWith('.supabase.co')) throw Error('invalid_storage_origin');
+        const file = await fetch(url.origin + '/storage/v1/object/authenticated/quiz-media/' + media.src, {
+          headers: { apikey: config.publishableKey, Authorization: 'Bearer ' + token },
+          cache: 'no-store',
+        });
+        if (!file.ok) throw Error('storage_forbidden');
+        const blob = await file.blob();
+        if (seq !== mediaLoadSequence) return;
+        mediaObjectUrl = URL.createObjectURL(blob);
+        const node = document.createElement(media.type === 'image' ? 'img' : 'video');
+        node.src = mediaObjectUrl;
+        if (media.type === 'image') node.alt = 'Imagen de la pregunta';
+        else { node.controls = true; node.preload = 'metadata'; }
+        area.append(node);
+        area.hidden = false;
+      }
+    } catch {
+      if (seq === mediaLoadSequence) {
+        $('presenter-media-status').hidden = false;
+        $('presenter-media-status').textContent = 'No se ha podido cargar el contenido multimedia. La pregunta puede continuar.';
+      }
+    }
+  }
   let animators = [];
   const identity = new Intl.Collator('es', { sensitivity: 'base' });
   // Los broadcasts NO llevan datos privados: son solo avisos para recargar.
@@ -66,6 +146,7 @@
     animators.push(setTimeout(fn, reduce() ? 0 : ms));
   }
   function show(name) {
+    if (name !== 'question-screen' && view === 'question-screen') clearMedia();
     view = name;
     for (const id of ['lobby','question-screen','ranking-screen','podium-screen']) {
       $(id).hidden = id !== name;
@@ -114,6 +195,7 @@
   window.addEventListener('beforeunload', () => {
     live?.stop();
     if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
+    clearMedia();
   });
 
   async function loadQr(s) {
@@ -166,6 +248,7 @@
     $('room-title').textContent = s.quiz_title || 'Cuestionario';
     $('step').textContent = 'Pregunta ' + (s.index + 1) + ' de ' + s.count;
     $('question').textContent = s.question?.text || '';
+    void loadQuestionMedia(s.index);
     const container = $('answers');
     container.replaceChildren();
     (s.question?.options || []).forEach((option, i) => {
