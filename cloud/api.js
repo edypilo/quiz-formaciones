@@ -493,7 +493,7 @@ function makeRouter(fetcher = fetch) {
       owner_id: 'eq.' + userId,
       status: 'eq.waiting',
       expires_at: 'gt.' + new Date().toISOString(),
-      select: 'id,quiz_id,pin,status,created_at,expires_at',
+      select: 'id,quiz_id,pin,join_secret,is_joinable,status,created_at,expires_at',
       order: 'created_at.desc',
       limit: '50',
     });
@@ -559,7 +559,7 @@ function makeRouter(fetcher = fetch) {
       for (let retry = 0; retry < 5; retry++) {
         const pin = String(crypto.randomInt(100000, 1000000));
         const response = await fetcher(url + '/rest/v1/quiz_rooms?select=' +
-          encodeURIComponent('id,quiz_id,pin,status,created_at,expires_at'), {
+          encodeURIComponent('id,quiz_id,pin,join_secret,is_joinable,status,created_at,expires_at'), {
           method: 'POST',
           headers: requestHeaders(req.cloud),
           body: JSON.stringify({
@@ -582,6 +582,58 @@ function makeRouter(fetcher = fetch) {
       return res.status(503).json({ error: 'room_pin_exhausted' });
     } catch {
       return res.status(502).json({ error: 'rooms_unavailable_or_migration_required' });
+    }
+  });
+
+
+  router.post('/rooms/:id/open', async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
+    const { url, key, jwt, userId } = req.cloud;
+    try {
+      // Verificación previa del anfitrión: no consultar ni abrir salas ajenas.
+      const params = new URLSearchParams({
+        id: 'eq.' + req.params.id, owner_id: 'eq.' + userId,
+        status: 'eq.waiting', expires_at: 'gt.' + new Date().toISOString(),
+        select: 'id,quiz_id,pin,join_secret,is_joinable,status,expires_at', limit: '1',
+      });
+      const lookup = await fetcher(url + '/rest/v1/quiz_rooms?' + params, {
+        headers: { apikey: key, Authorization: 'Bearer ' + jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const rows = await readJson(lookup);
+      if (!lookup.ok || !Array.isArray(rows)) return res.status(502).json({ error: 'room_query_failed' });
+      if (!rows.length) return res.status(404).json({ error: 'room_not_found' });
+      const response = await fetcher(url + '/rest/v1/rpc/quiz_host_open_room', {
+        method: 'POST',
+        headers: { apikey: key, Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_room_id: req.params.id }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const success = await readJson(response);
+      if (!response.ok || success !== true) return res.status(502).json({ error: 'room_open_failed' });
+      return res.json({ ...rows[0], is_joinable: true });
+    } catch {
+      return res.status(502).json({ error: 'room_open_failed' });
+    }
+  });
+
+  router.get('/rooms/:id/players', async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
+    const { url, key, jwt, userId } = req.cloud;
+    const params = new URLSearchParams({
+      room_id: 'eq.' + req.params.id, owner_id: 'eq.' + userId,
+      select: 'id,nickname,joined_at', order: 'joined_at.asc', limit: '60',
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_room_players?' + params, {
+        headers: { apikey: key, Authorization: 'Bearer ' + jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const rows = await readJson(response);
+      if (!response.ok || !Array.isArray(rows)) return res.status(502).json({ error: 'player_query_failed' });
+      return res.json(rows);
+    } catch {
+      return res.status(502).json({ error: 'player_query_failed' });
     }
   });
 
