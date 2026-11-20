@@ -26,6 +26,25 @@
   let token = '';
   let nickname = '';
   let polling = null;
+  let realtime = null;
+  let checkBusy = false;
+  let checkAgain = false;
+  let fallbackTicks = 0;
+  function ensureRealtime() {
+    if (!settings || !token || !window.QuizzzGuestRealtime) return;
+    if (!realtime) {
+      realtime = window.QuizzzGuestRealtime.createGuestRealtime({
+        rpc, config: settings,
+        onChange: () => void checkRoom(),
+        onStatus: (mode) => {
+          $('guest-connection-mode').textContent = mode === 'live'
+            ? '● En directo' : mode === 'connecting' ? '◌ Conectando…'
+              : mode === 'off' ? '' : '◌ Sincronización de respaldo';
+        },
+      });
+    }
+    realtime.start(token);
+  }
   let currentQuestionKey = '';
   let answerSubmitting = false;
   let deadline = 0;
@@ -84,6 +103,7 @@
   }
   function closeSession() {
     clearPolling();
+    realtime?.stop();
     token = '';
     nickname = '';
     sessionStorage.removeItem(storageKey);
@@ -346,6 +366,11 @@
 
   async function checkRoom() {
     if (!token) return;
+    if (checkBusy) {
+      checkAgain = true;
+      return;
+    }
+    checkBusy = true;
     try {
       const result = await rpc('quiz_guest_status', { p_token: token });
       if (!result?.ok) {
@@ -367,6 +392,12 @@
       }
     } catch {
       message('waiting-status', 'Conexión interrumpida. Volveremos a comprobarla.', 'error');
+    } finally {
+      checkBusy = false;
+      if (checkAgain && token) {
+        checkAgain = false;
+        void checkRoom();
+      } else checkAgain = false;
     }
   }
   function showWaiting() {
@@ -374,8 +405,14 @@
     $('waiting-section').hidden = false;
     $('welcome').textContent = 'Jugador: ' + nickname;
     clearPolling();
+    ensureRealtime();
     void checkRoom();
-    polling = setInterval(() => void checkRoom(), 3000);
+    fallbackTicks = 0;
+    polling = setInterval(() => {
+      if (document.hidden) return;
+      // Consulta cada 3 s sin Realtime, cada 15 s si está conectado.
+      if (!realtime?.isLive() || ++fallbackTicks % 5 === 0) void checkRoom();
+    }, 3000);
   }
   $('join-form').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -417,6 +454,9 @@
     } finally {
       $('join-button').disabled = false;
     }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && token) void checkRoom();
   });
   $('leave').addEventListener('click', async () => {
     const currentToken = token;
