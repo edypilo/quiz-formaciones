@@ -9,7 +9,13 @@ main{max-width:520px;margin:8vh auto;padding:24px}h1{font-size:clamp(32px,7vw,48
 label{font-size:.94rem;font-weight:700;display:block;margin:18px 0 6px}input{width:100%;font:inherit;padding:14px;border:1px solid #bdcbe4;border-radius:12px;color:inherit}
 button{font:inherit;border:0;background:#315cce;color:white;font-weight:750;border-radius:12px;padding:14px 20px;cursor:pointer}
 button:disabled{opacity:.65;cursor:wait}.full{width:100%;margin-top:25px}.hint{color:#586d88;line-height:1.5}
-.guest-choices{display:grid;gap:12px;margin:16px 0}.guest-choices button{text-align:left;background:#eaf1ff;color:#1d3875;border:1px solid #aabfed;font-size:1.04rem;padding:15px}.guest-choices button:hover:not(:disabled){background:#d6e4ff}.guest-choices button.selected{background:#315cce;color:#fff}.guest-choices button.correct{background:#b8efcf;color:#14532d;border-color:#2eaa63}.guest-choices button:disabled{opacity:.78;cursor:default}.feedback-panel{margin:22px 0 12px;padding:28px 15px;border-radius:22px;background:#edf5ff;border:2px solid #b8cff3;text-align:center;animation:feedback-enter .35s ease-out}.feedback-panel[data-outcome=correct]{background:#e6f8ed;border-color:#7bd5a1}.feedback-panel[data-outcome=incorrect]{background:#fff4e8;border-color:#f5c88b}.feedback-panel[data-outcome=unanswered]{background:#f3f0ff;border-color:#c6b8f5}.feedback-panel[data-outcome=participated]{background:#e9f5ff;border-color:#a6d9f5}.feedback-icon{font-size:3.6rem;line-height:1.2;margin-bottom:12px}.feedback-panel h2{font-size:clamp(25px,6vw,36px);margin:8px 0;color:#17356a}.feedback-message{font-size:1.06rem;line-height:1.55;margin:12px auto;max-width:35ch}.feedback-points{font-size:clamp(25px,7vw,40px);font-weight:900;color:#237348;margin:16px 0}.feedback-panel[data-outcome=incorrect] .feedback-points,.feedback-panel[data-outcome=unanswered] .feedback-points{color:#666b80}.feedback-panel #guest-feedback-present{margin:12px 0 6px}@keyframes feedback-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@media(prefers-reduced-motion:reduce){.feedback-panel{animation:none}}.status{min-height:1.5rem;margin:20px 0 0;color:#526886}.status[data-type=error]{color:#a22035}.status[data-type=success]{color:#217347}
+.guest-choices{display:grid;gap:12px;margin:16px 0}.guest-choices button{text-align:left;background:#eaf1ff;color:#1d3875;border:1px solid #aabfed;font-size:1.04rem;padding:15px}.guest-choices button:hover:not(:disabled){background:#d6e4ff}.guest-choices button.selected{background:#315cce;color:#fff}.guest-choices button.correct{background:#b8efcf;color:#14532d;border-color:#2eaa63}.guest-choices button:disabled{opacity:.78;cursor:default}
+.guest-choices button{color:#fff!important;border:0;display:flex;align-items:center;gap:15px;min-height:85px;font-weight:850;font-size:clamp(17px,4vw,24px)}
+.guest-choices button.c0{background:#e0374b}.guest-choices button.c1{background:#226cd3}.guest-choices button.c2{background:#c38b08}.guest-choices button.c3{background:#289046}
+.guest-choices button .shape{font-size:1.45em;min-width:1.6em;text-align:center}
+.guest-choices button.selected{outline:4px solid #13264c;filter:saturate(1.25)}
+.guest-choices button:disabled{opacity:.72}
+.guest-choices button.correct{outline:4px solid #16b96c;opacity:1}.feedback-panel{margin:22px 0 12px;padding:28px 15px;border-radius:22px;background:#edf5ff;border:2px solid #b8cff3;text-align:center;animation:feedback-enter .35s ease-out}.feedback-panel[data-outcome=correct]{background:#e6f8ed;border-color:#7bd5a1}.feedback-panel[data-outcome=incorrect]{background:#fff4e8;border-color:#f5c88b}.feedback-panel[data-outcome=unanswered]{background:#f3f0ff;border-color:#c6b8f5}.feedback-panel[data-outcome=participated]{background:#e9f5ff;border-color:#a6d9f5}.feedback-icon{font-size:3.6rem;line-height:1.2;margin-bottom:12px}.feedback-panel h2{font-size:clamp(25px,6vw,36px);margin:8px 0;color:#17356a}.feedback-message{font-size:1.06rem;line-height:1.55;margin:12px auto;max-width:35ch}.feedback-points{font-size:clamp(25px,7vw,40px);font-weight:900;color:#237348;margin:16px 0}.feedback-panel[data-outcome=incorrect] .feedback-points,.feedback-panel[data-outcome=unanswered] .feedback-points{color:#666b80}.feedback-panel #guest-feedback-present{margin:12px 0 6px}@keyframes feedback-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@media(prefers-reduced-motion:reduce){.feedback-panel{animation:none}}.status{min-height:1.5rem;margin:20px 0 0;color:#526886}.status[data-type=error]{color:#a22035}.status[data-type=success]{color:#217347}
 [hidden]{display:none!important}.wait{text-align:center}.count{font-size:28px;font-weight:800}
 .random-name{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px;background:#f2f6ff;border:1px solid #dbe5f5;border-radius:12px}.name-display{font-size:1.15rem;font-weight:800;flex:1;min-width:160px}.random-name button{font-size:.89rem;padding:10px 12px}.random-name button:disabled{opacity:.55}
 </style><script defer src="/cloud-names.js"></script><script defer src="/join.js"></script></head><body>
@@ -39,8 +45,15 @@ button:disabled{opacity:.65;cursor:wait}.full{width:100%;margin-top:25px}.hint{c
   <p id="guest-feedback-message" class="feedback-message"></p>
   <p id="guest-feedback-points" class="feedback-points"></p>
   <button id="guest-feedback-present" type="button" hidden>¡Aquí sigo! 🙌</button>
+  <p id="guest-feedback-standing" class="hint" hidden></p>
   <p id="guest-feedback-next" class="hint">Esperando la siguiente pregunta…</p>
 </section>
+</section>
+<section id="guest-final" class="feedback-panel" hidden aria-live="polite" aria-label="Clasificación final">
+<div id="guest-final-emoji" class="feedback-icon">🥁</div>
+<h2 id="guest-final-title">¡Mira la pantalla!</h2>
+<p id="guest-final-description" class="feedback-message">Vamos a conocer el podio…</p>
+<p id="guest-final-score" class="feedback-points"></p>
 </section>
 <button id="leave" type="button">Salir de la sala</button>
 <p id="waiting-status" class="status" aria-live="polite" role="status"></p></section>
