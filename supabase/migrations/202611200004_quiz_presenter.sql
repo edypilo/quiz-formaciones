@@ -62,11 +62,11 @@ begin
              from public.quiz_room_answers a
             where a.room_id = v_room.id
               and a.question_index = v_room.game_question_index
-              and a.selected @> jsonb_build_array(i))
-          order by i
+              and a.selected @> jsonb_build_array(gs.choice))
+          order by gs.choice
         ), '[]'::jsonb)
         into v_distribution
-        from generate_series(0, jsonb_array_length(v_question->'options') - 1) as i;
+        from generate_series(0, jsonb_array_length(v_question->'options') - 1) as gs(choice);
     end if;
     v_public_question := jsonb_build_object(
       'text', v_question->>'text',
