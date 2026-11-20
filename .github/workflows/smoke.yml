@@ -22,4 +22,5 @@ jobs:
       - run: node --check cloud/effects.js
       - run: node --check cloud/presentation.js
       - run: node --check cloud/presenter.js
+      - run: node --check cloud/realtime-host.js
       - run: node --test tests/*.test.js
