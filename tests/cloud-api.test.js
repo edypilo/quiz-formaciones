@@ -650,3 +650,44 @@ test('host puede abrir una sala propia por RPC y listar jugadores sin token secr
     keys.forEach((key, i) => { if (before[i] === undefined) delete process.env[key]; else process.env[key] = before[i]; });
   }
 });
+
+test('QR protegido requiere JWT y acepta solo URL de invitación de este host', async () => {
+  const keys = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_ANON_KEY'];
+  const old = keys.map(k => process.env[k]);
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const roomId = 'd5f47ca1-a416-43a3-8341-6dffca530f3f';
+  const invite = '65e74e9e-c977-4a08-86fa-f3517cb997b0';
+  let roomQuery = '';
+  const fetcher = async (url, options) => {
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (String(url).includes('/quiz_rooms?')) {
+      roomQuery = String(url);
+      return mock([{ id: roomId }]);
+    }
+    throw Error('Unexpected fetch');
+  };
+  try {
+    await withApi(fetcher, {}, async (base) => {
+      const host = new URL(base).host;
+      const endpoint = base + '/api/cloud/rooms/' + roomId + '/qr';
+      const url = 'https://' + host + '/join?pin=643287&invite=' + invite;
+      const body = JSON.stringify({ url });
+      const headers = { Authorization: 'Bearer test.jwt.signature', 'Content-Type': 'application/json' };
+      assert.equal((await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })).status, 401);
+      assert.equal((await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ url: 'https://bad.example/join?pin=643287&invite=' + invite }) })).status, 400);
+      assert.equal((await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ url: 'https://' + host + '/join?pin=643287&invite=' + invite + '&extra=1' }) })).status, 400);
+      const result = await fetch(endpoint, { method: 'POST', headers, body });
+      assert.equal(result.status, 200);
+      assert.equal(result.headers.get('content-type'), 'image/png');
+      const bytes = Buffer.from(await result.arrayBuffer());
+      assert.equal(bytes.subarray(1, 4).toString(), 'PNG');
+      assert.ok(roomQuery.includes('owner_id=eq.' + USER));
+      assert.ok(roomQuery.includes('pin=eq.643287'));
+      assert.ok(roomQuery.includes('join_secret=eq.' + invite));
+    });
+  } finally {
+    keys.forEach((key,i) => { if (old[i] === undefined) delete process.env[key]; else process.env[key] = old[i]; });
+  }
+});
