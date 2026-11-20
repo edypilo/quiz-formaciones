@@ -101,6 +101,13 @@
         answers.append(button);
       });
     }
+    if (!state.answered && phase === 'question' && !answerSubmitting &&
+        (!deadline || Date.now() < deadline)) {
+      $('guest-question-options').querySelectorAll('button').forEach(button => {
+        button.disabled = false;
+        button.classList.remove('selected');
+      });
+    }
     if (state.answered) {
       $('guest-question-options').querySelectorAll('button').forEach(button => { button.disabled = true; });
       message('guest-question-message', phase === 'question'
