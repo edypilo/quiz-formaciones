@@ -22,7 +22,6 @@
     message('join-status', '');
   }
   $('shuffle-name').addEventListener('click', assignNewName);
-  assignNewName();
   let settings = null;
   let token = '';
   let nickname = '';
@@ -33,6 +32,7 @@
     node.textContent = text;
     node.dataset.type = type;
   };
+  assignNewName();
   async function rpc(name, payload) {
     if (!settings) throw new Error('not_configured');
     const response = await fetch(settings.supabaseUrl + '/rest/v1/rpc/' + name, {
