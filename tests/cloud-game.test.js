@@ -69,6 +69,7 @@ test('formador consulta estado de pregunta con filtro por propietario',async()=>
     assert.equal(game.phase,'question');
     assert.equal(game.question.text,'¿Qué es IA?');
     assert.equal(game.question.correct,null);
+    assert.ok(game.question.media === null || typeof game.question.media === 'object');
     assert.ok(read.includes('owner_id=eq.'+userId));
     assert.equal((await fetch(base+'/api/cloud/rooms/'+roomId+'/game')).status,401);
   });
@@ -262,4 +263,22 @@ test('Realtime invitado: WebSocket no revela token y conserva consultas de respa
   assert.match(join,/!realtime\?\.isLive\(\)/);
   assert.match(html,/cloud-realtime-guest\.js/);
   assert.match(html,/id="guest-connection-mode"/);
+});
+
+test('presentador: recursos privados solo con JWT del formador y YouTube con host validado',()=>{
+  const presenter=fs.readFileSync(path.join(__dirname,'../cloud/presenter.js'),'utf8');
+  const guest=fs.readFileSync(path.join(__dirname,'../cloud/join.js'),'utf8');
+  const api=fs.readFileSync(path.join(__dirname,'../cloud/api.js'),'utf8');
+  const page=fs.readFileSync(path.join(__dirname,'../cloud/presenter.html'),'utf8');
+  const server=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8');
+  assert.match(api,/media: normalizeCloudMedia\(q\.media, userId\) \|\| null/);
+  assert.match(presenter,/Authorization: 'Bearer ' \+ token/);
+  assert.match(presenter,/\/storage\/v1\/object\/authenticated\/quiz-media\//);
+  assert.match(presenter,/www\.youtube-nocookie\.com\/embed\//);
+  assert.match(presenter,/clearMedia\(\)/);
+  assert.match(guest,/https:\/\/www\.youtube\.com\/watch\?v=/);
+  assert.match(guest,/link\.rel = 'noopener noreferrer'/);
+  assert.match(page,/id="presenter-media"/);
+  assert.match(server,/frame-src https:\/\/www\.youtube-nocookie\.com/);
+  assert.doesNotMatch(server,/storage\/v1\/object\/public\/quiz-media/);
 });
