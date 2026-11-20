@@ -247,10 +247,41 @@
         pin.textContent = 'PIN de prueba: ' + room.pin + ' · Caduca: ' +
           new Date(room.expires_at).toLocaleString('es-ES');
         detail.append(name, pin);
+        const controls = document.createElement('div');
+        controls.className = 'actions';
+        controls.style.margin = '0';
+        if (!room.is_joinable) {
+          const open = document.createElement('button');
+          open.type = 'button'; open.className = 'minor';
+          open.textContent = 'Habilitar invitados';
+          open.addEventListener('click', () => void openRoom(room));
+          controls.append(open);
+        } else {
+          const url = new URL('/join', window.location.origin);
+          url.searchParams.set('pin', room.pin);
+          url.searchParams.set('invite', room.join_secret);
+          const invite = document.createElement('button');
+          invite.type = 'button'; invite.className = 'minor';
+          invite.textContent = 'Copiar invitación';
+          invite.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.writeText(url.href);
+              roomMessage('Invitación copiada. El destinatario necesitará acceso autorizado a Vercel Preview.', 'success');
+            } catch {
+              window.prompt('Copia esta invitación:', url.href);
+            }
+          });
+          const players = document.createElement('button');
+          players.type = 'button'; players.className = 'minor';
+          players.textContent = 'Ver participantes';
+          players.addEventListener('click', () => void viewPlayers(room));
+          controls.append(invite, players);
+        }
         const close = document.createElement('button');
         close.type = 'button'; close.className = 'minor'; close.textContent = 'Cerrar sala';
         close.addEventListener('click', () => closeRoom(room));
-        li.append(detail, close);
+        controls.append(close);
+        li.append(detail, controls);
         list.append(li);
       }
       roomMessage('Listado de salas actualizado.', 'success');
@@ -288,6 +319,41 @@
         '. Es solo una prueba privada; los jugadores todavía no pueden entrar.', 'success');
     } catch {
       roomMessage('Error de conexión al crear la sala.', 'error');
+    }
+  }
+
+  async function openRoom(room) {
+    if (!window.confirm('¿Habilitar la entrada de invitados a esta sala? Sigue siendo una prueba protegida por Vercel.')) return;
+    if (!(await refreshAccess())) {
+      closeSession(); message(status, 'La sesión ha caducado.', 'error'); return;
+    }
+    try {
+      const response = await fetch('/api/cloud/rooms/' + encodeURIComponent(room.id) + '/open', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + accessToken },
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('open_failed');
+      await refreshRooms();
+      roomMessage('Inscripciones habilitadas. Utiliza «Copiar invitación» para la prueba móvil.', 'success');
+    } catch {
+      roomMessage('No se pudo abrir la inscripción. Comprueba que has ejecutado la migración nueva.', 'error');
+    }
+  }
+  async function viewPlayers(room) {
+    if (!(await refreshAccess())) return;
+    try {
+      const response = await fetch('/api/cloud/rooms/' + encodeURIComponent(room.id) + '/players', {
+        headers: { Authorization: 'Bearer ' + accessToken }, cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('players_failed');
+      const players = await json(response);
+      if (!Array.isArray(players)) throw new Error('invalid_response');
+      const details = players.length
+        ? players.map((player, i) => (i + 1) + '. ' + player.nickname).join(' · ')
+        : 'Todavía no hay jugadores.';
+      roomMessage('Participantes (' + players.length + '): ' + details, 'success');
+    } catch {
+      roomMessage('No se ha podido consultar la lista de participantes.', 'error');
     }
   }
   async function closeRoom(room) {
