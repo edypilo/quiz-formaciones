@@ -56,6 +56,54 @@
   let finalLoadStarted = false;
   let lastStanding = null;
   const shapes = ['▲','◆','●','■'];
+  let privateMediaSequence = 0;
+  let privateMediaIndex = -1;
+  function clearPrivateMedia() {
+    privateMediaSequence++;
+    privateMediaIndex = -1;
+    $('guest-private-media').replaceChildren();
+    $('guest-private-media').hidden = true;
+    $('guest-private-media-status').hidden = true;
+  }
+  async function loadPrivateMedia(media, index) {
+    if (!token || !['image','video'].includes(media?.type) ||
+        privateMediaIndex === index) return;
+    clearPrivateMedia();
+    privateMediaIndex = index;
+    const seq = privateMediaSequence;
+    $('guest-private-media-status').textContent = 'Cargando multimedia…';
+    $('guest-private-media-status').hidden = false;
+    try {
+      const response = await fetch('/api/cloud/guest/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+        cache: 'no-store',
+      });
+      if (!response.ok) throw Error('media_unavailable');
+      const data = await response.json();
+      if (seq !== privateMediaSequence || data?.ok !== true ||
+          data.type !== media.type || data.index !== index) return;
+      const u = new URL(data.url);
+      if (u.protocol !== 'https:' ||
+          !u.hostname.endsWith('.supabase.co') ||
+          !u.pathname.startsWith('/storage/v1/object/sign/quiz-media/'))
+        throw Error('media_url_invalid');
+      const el = document.createElement(data.type === 'image' ? 'img' : 'video');
+      el.src = u.href;
+      if (data.type === 'image') el.alt = 'Imagen de la pregunta';
+      else { el.controls = true; el.preload = 'metadata'; }
+      $('guest-private-media').append(el);
+      $('guest-private-media').hidden = false;
+      $('guest-private-media-status').hidden = true;
+    } catch {
+      if (seq === privateMediaSequence) {
+        $('guest-private-media-status').textContent =
+          'El archivo no se pudo cargar. Puedes responder mirando la pantalla del docente.';
+        $('guest-private-media-status').hidden = false;
+      }
+    }
+  }
   const encouragements = Object.freeze([
     '¡Casi! La próxima puede ser la tuya.',
     '¡Sigue jugando, que aún queda partida!',
@@ -104,6 +152,7 @@
   function closeSession() {
     clearPolling();
     realtime?.stop();
+    clearPrivateMedia();
     token = '';
     nickname = '';
     sessionStorage.removeItem(storageKey);
@@ -268,6 +317,7 @@
     const question = state.question;
     $('guest-game').hidden = !question || !['question', 'reveal'].includes(phase);
     if (phase === 'finished') {
+      clearPrivateMedia();
       if (currentQuestionKey !== 'finished') {
         currentQuestionKey = 'finished';
         resetPersonalFeedback();
@@ -295,10 +345,13 @@
       currentQuestionKey = key;
       $('guest-question-options').replaceChildren();
       resetPersonalFeedback();
+      clearPrivateMedia();
+      if (phase === 'question') void loadPrivateMedia(question.media, question.index);
     }
     const revealing = phase === 'reveal';
     $('guest-question-text').hidden = revealing;
     $('guest-media').hidden = revealing || !$('guest-media').hasChildNodes();
+    if (revealing) clearPrivateMedia();
     $('guest-question-time').hidden = revealing;
     $('guest-question-options').hidden = revealing;
     $('guest-question-message').hidden = revealing;
