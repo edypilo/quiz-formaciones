@@ -53,7 +53,7 @@ if (IS_CLOUD) {
       'X-Content-Type-Options': 'nosniff',
       'X-Robots-Tag': 'noindex, nofollow',
       'Content-Security-Policy': type === 'html'
-        ? "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' blob:; media-src 'self' blob:; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'"
+        ? "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' blob:; media-src 'self' blob:; frame-src https://www.youtube-nocookie.com; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'"
         : "default-src 'none'",
     });
     return res.type(type).sendFile(path.join(__dirname, 'cloud', name));
