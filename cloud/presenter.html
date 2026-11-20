@@ -15,7 +15,7 @@ h1{font-size:clamp(28px,5.5vw,62px);line-height:1.12;margin:10px 0 18px}h2{font-
 .people{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}.person{padding:9px 14px;border-radius:100px;background:#eaf0ff;border:1px solid #c8d9f5;font-weight:750;font-size:clamp(15px,1.5vw,20px)}
 .counter{font-size:clamp(23px,3.2vw,39px);font-weight:850;color:#234bb0}.footer-controls{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:22px 0}
 .qtop{display:flex;justify-content:space-between;gap:18px;align-items:center;flex-wrap:wrap}.question{background:#fff;text-align:center;margin:24px 0;padding:30px;border-radius:23px;border:1px solid #dae5f8;font-size:clamp(26px,4.2vw,56px);font-weight:880;line-height:1.2}
-.timer{font-size:clamp(40px,5.8vw,78px);font-weight:950;color:#285ac7;background:#fff;border:3px solid #a7bff3;border-radius:50%;width:120px;height:120px;display:grid;place-items:center}.received{font-size:clamp(22px,3vw,38px);font-weight:800}.answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(10px,1.8vw,20px)}
+.timer{font-size:clamp(40px,5.8vw,78px);font-weight:950;color:#285ac7;background:#fff;border:3px solid #a7bff3;border-radius:50%;width:120px;height:120px;display:grid;place-items:center}.received{font-size:clamp(22px,3vw,38px);font-weight:800}.presenter-media{max-width:880px;margin:0 auto 22px;text-align:center}.presenter-media img,.presenter-media video{max-height:40vh;max-width:100%;object-fit:contain;border-radius:16px;box-shadow:0 6px 22px #17356022}.presenter-media iframe{display:block;width:min(100%,760px);aspect-ratio:16/9;border:0;border-radius:16px;margin:auto}.presenter-media-status{text-align:center;margin:8px auto 16px}.presenter-media[hidden]{display:none!important}.answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(10px,1.8vw,20px)}
 .answer{min-height:120px;border-radius:18px;padding:22px;display:flex;gap:20px;align-items:center;color:#fff;font-size:clamp(19px,2.4vw,35px);font-weight:850;transition:opacity .3s,transform .3s;overflow-wrap:anywhere}
 .answer .shape{font-size:1.4em;flex:0 0 1.6em;text-align:center}.answer.c0{background:#e0374b}.answer.c1{background:#226cd3}.answer.c2{background:#c38b08}.answer.c3{background:#289046}
 .answer.dim{opacity:.3}.answer.correct{outline:5px solid #15b86e;transform:scale(1.015)}
@@ -41,7 +41,7 @@ h1{font-size:clamp(28px,5.5vw,62px);line-height:1.12;margin:10px 0 18px}h2{font-
 <p class="muted">La lista se actualiza automáticamente. Mira la pantalla para seguir el juego.</p></div></div></section>
 <section id="question-screen" class="screen" hidden>
 <div class="qtop"><div><h2 id="step">Pregunta</h2><div id="responses" class="received">0 respuestas</div></div><div id="timer" class="timer">0</div></div>
-<div id="question" class="question"></div><div id="answers" class="answers"></div>
+<div id="question" class="question"></div><div id="presenter-media" class="presenter-media" hidden aria-label="Contenido multimedia de la pregunta"></div><p id="presenter-media-status" class="muted" role="status" hidden></p><div id="answers" class="answers"></div>
 <div id="distribution" class="bars" hidden></div><div id="explanation" class="explanation" hidden></div>
 <div class="footer-controls"><button id="ranking-button" hidden type="button">Ver clasificación ▶</button></div>
 </section>
