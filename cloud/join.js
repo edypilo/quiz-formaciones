@@ -34,6 +34,9 @@
   let feedbackPendingKey = '';
   let feedbackSequence = 0;
   let presenceConfirmedKey = '';
+  let finalLoadStarted = false;
+  let lastStanding = null;
+  const shapes = ['▲','◆','●','■'];
   const encouragements = Object.freeze([
     '¡Casi! La próxima puede ser la tuya.',
     '¡Sigue jugando, que aún queda partida!',
@@ -88,6 +91,9 @@
     $('guest-game').hidden = true;
     currentQuestionKey = '';
     lastGamePhase = '';
+    finalLoadStarted = false;
+    lastStanding = null;
+    $('guest-final').hidden = true;
     resetPersonalFeedback();
     $('join-section').hidden = false;
   }
@@ -98,6 +104,8 @@
     feedbackCompletedKey = '';
     feedbackPendingKey = '';
     presenceConfirmedKey = '';
+    $('guest-feedback-standing').hidden = true;
+    $('guest-feedback-standing').textContent = '';
     $('guest-feedback').hidden = true;
     $('guest-feedback').removeAttribute('data-outcome');
     $('guest-feedback-present').hidden = true;
@@ -153,6 +161,7 @@
       if (sequence !== feedbackSequence || currentQuestionKey !== key) return;
       if (!result?.ok || result.index !== index || !drawPersonalFeedback(result, key))
         throw new Error('feedback_not_ready');
+      await loadPersonalStanding();
     } catch {
       if (sequence === feedbackSequence && currentQuestionKey === key) {
         $('guest-feedback').dataset.outcome = 'loading';
@@ -166,14 +175,69 @@
     }
   }
 
+
+  async function loadPersonalStanding() {
+    if (!token) return;
+    try {
+      const standing = await rpc('quiz_guest_standing', { p_token: token });
+      if (!standing?.ok || !currentQuestionKey.endsWith(':reveal')) return;
+      lastStanding = standing;
+      const change = Number(standing.previous_position) - Number(standing.position);
+      const moved = change > 0 ? ' ▲ Has subido ' + change + ' puesto(s).'
+        : change < 0 ? ' ▼ Has bajado ' + Math.abs(change) + ' puesto(s).' : '';
+      $('guest-feedback-standing').textContent =
+        'Vas en el puesto ' + standing.position + ' de ' + standing.total +
+        ' · ' + Number(standing.score).toLocaleString('es-ES') + ' puntos.' + moved;
+      $('guest-feedback-standing').hidden = false;
+    } catch {
+      // El feedback por pregunta funciona independientemente del puesto personal.
+    }
+  }
+  async function loadFinalStanding() {
+    if (finalLoadStarted) return;
+    finalLoadStarted = true;
+    $('guest-final').hidden = false;
+    $('guest-final-title').textContent = '¡Mira la pantalla!';
+    $('guest-final-emoji').textContent = '🥁';
+    $('guest-final-score').textContent = '';
+    $('guest-final-description').textContent = 'Vamos a conocer el podio…';
+    try {
+      const standing = await rpc('quiz_guest_standing', { p_token: token });
+      if (!standing?.ok) throw new Error('standing_unavailable');
+      lastStanding = standing;
+      setTimeout(() => {
+        if (!token || $('guest-final').hidden) return;
+        const place = Number(standing.position);
+        const medal = ['🥇','🥈','🥉'][place - 1];
+        $('guest-final-emoji').textContent = medal || '🎉';
+        $('guest-final-title').textContent = medal ? '¡Estás en el podio!' : '¡Partida terminada!';
+        $('guest-final-description').textContent =
+          'Puesto ' + place + ' de ' + standing.total + '. ¡Gracias por participar!';
+        $('guest-final-score').textContent = Number(standing.score).toLocaleString('es-ES') + ' puntos';
+      }, 4800);
+    } catch {
+      finalLoadStarted = false;
+      $('guest-final-title').textContent = 'Clasificación pendiente';
+      $('guest-final-description').textContent = 'Volveremos a intentar recuperar tu puesto.';
+    }
+  }
+
   function renderGame(state) {
     const phase = state.game_phase || 'lobby';
     const question = state.question;
     $('guest-game').hidden = !question || !['question', 'reveal'].includes(phase);
     if (phase === 'finished') {
-      resetPersonalFeedback();
+      if (currentQuestionKey !== 'finished') {
+        currentQuestionKey = 'finished';
+        resetPersonalFeedback();
+      }
       $('waiting-text').textContent = '¡Partida terminada! Gracias por participar.';
+      void loadFinalStanding();
       return;
+    }
+    if (finalLoadStarted || !$('guest-final').hidden) {
+      finalLoadStarted = false;
+      $('guest-final').hidden = true;
     }
     if (!question) {
       if (phase === 'lobby') $('waiting-text').textContent = 'Esperando al formador…';
@@ -206,7 +270,14 @@
         if (!option) return;
         const button = document.createElement('button');
         button.type = 'button';
-        button.textContent = (index + 1) + '. ' + option;
+        button.className = 'c' + (index % 4);
+        button.dataset.index = String(index);
+        const shape = document.createElement('span');
+        shape.className = 'shape';
+        shape.textContent = shapes[index % 4];
+        const content = document.createElement('span');
+        content.textContent = option;
+        button.append(shape, content);
         if (phase === 'reveal' && question.correct?.includes(index)) button.classList.add('correct');
         if (phase !== 'question' || state.answered) button.disabled = true;
         button.addEventListener('click', () => void submitAnswer(index));
@@ -251,7 +322,8 @@
     answerSubmitting = true;
     const buttons = $('guest-question-options').querySelectorAll('button');
     buttons.forEach(button => { button.disabled = true; });
-    if (buttons[index]) buttons[index].classList.add('selected');
+    const selected = Array.from(buttons).find(button => Number(button.dataset.index) === index);
+    if (selected) selected.classList.add('selected');
     message('guest-question-message', 'Enviando respuesta…');
     try {
       const response = await rpc('quiz_guest_answer', {
