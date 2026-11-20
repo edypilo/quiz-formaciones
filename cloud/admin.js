@@ -29,7 +29,7 @@
   let playerRefreshBusy = false;
   let playerPolling = null;
   let selectedQrRoomId = '';
-  const pollingMs = 5000;
+  const pollingMs = 3000;
 
   const allowedMedia = Object.freeze({
     'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif',
