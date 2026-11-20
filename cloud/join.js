@@ -5,6 +5,24 @@
   const invitation = params.get('invite') || '';
   const initialPin = params.get('pin') || '';
   $('pin').value = /^[0-9]{6}$/.test(initialPin) ? initialPin : '';
+  $('qr-instructions').hidden = !(/^[0-9]{6}$/.test(initialPin) && invitation);
+  $('pin').readOnly = !!(/^[0-9]{6}$/.test(initialPin) && invitation);
+  function assignNewName() {
+    const generate = window.QuizzzNames?.generateName;
+    if (typeof generate !== 'function') {
+      $('name-display').textContent = 'No se pueden generar nombres.';
+      $('join-button').disabled = true;
+      return;
+    }
+    const current = $('nickname').value;
+    let candidate = generate();
+    for (let i = 0; i < 10 && candidate.name === current; i++) candidate = generate();
+    $('nickname').value = candidate.name;
+    $('name-display').textContent = candidate.emoji + ' ' + candidate.name;
+    message('join-status', '');
+  }
+  $('shuffle-name').addEventListener('click', assignNewName);
+  assignNewName();
   let settings = null;
   let token = '';
   let nickname = '';
@@ -89,9 +107,10 @@
           invalid_data: 'Comprueba el PIN y el nombre.',
           room_unavailable: 'La sala no está abierta, ha caducado o el enlace no coincide.',
           room_full: 'La sala ha alcanzado su capacidad.',
-          name_taken: 'Ese nombre ya está en uso. Elige otro.',
+          name_taken: 'Ese nombre ya está en uso. Hemos generado otro para ti.',
           rate_limited: 'Demasiados intentos. Inténtalo más tarde.',
         };
+        if (result?.error === 'name_taken') assignNewName();
         message('join-status', errors[result?.error] || 'No se pudo acceder a la sala.', 'error');
         return;
       }
