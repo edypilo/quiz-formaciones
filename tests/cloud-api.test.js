@@ -766,14 +766,14 @@ test('invitado multimedia: firma temporal solo tras validar token, ruta y fase p
       const body=await ok.json();
       assert.equal(body.ok,true);
       assert.equal(body.index,0);
-      assert.equal(body.expiresIn,30);
+      assert.equal(body.expiresIn,300);
       assert.equal(body.url,'https://example.supabase.co/storage/v1'+signedUrl);
       assert.equal(calls.length,2);
       assert.equal(calls[0].options.headers.apikey,'sb_publishable_test');
       assert.equal(calls[0].options.headers.Authorization,undefined);
       assert.equal(calls[1].options.headers.apikey,'service_secret_test');
       assert.equal(calls[1].options.headers.Authorization,'Bearer service_secret_test');
-      assert.equal(JSON.parse(calls[1].options.body).expiresIn,30);
+      assert.equal(JSON.parse(calls[1].options.body).expiresIn,300);
       result={ok:false,error:'question_not_active'};
       assert.equal((await post({token})).status,403);
       assert.equal(calls.length,3);
