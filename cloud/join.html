@@ -9,13 +9,13 @@ main{max-width:520px;margin:8vh auto;padding:24px}h1{font-size:clamp(32px,7vw,48
 label{font-size:.94rem;font-weight:700;display:block;margin:18px 0 6px}input{width:100%;font:inherit;padding:14px;border:1px solid #bdcbe4;border-radius:12px;color:inherit}
 button{font:inherit;border:0;background:#315cce;color:white;font-weight:750;border-radius:12px;padding:14px 20px;cursor:pointer}
 button:disabled{opacity:.65;cursor:wait}.full{width:100%;margin-top:25px}.hint{color:#586d88;line-height:1.5}
-.status{min-height:1.5rem;margin:20px 0 0;color:#526886}.status[data-type=error]{color:#a22035}.status[data-type=success]{color:#217347}
+.guest-choices{display:grid;gap:12px;margin:16px 0}.guest-choices button{text-align:left;background:#eaf1ff;color:#1d3875;border:1px solid #aabfed;font-size:1.04rem;padding:15px}.guest-choices button:hover:not(:disabled){background:#d6e4ff}.guest-choices button.selected{background:#315cce;color:#fff}.guest-choices button.correct{background:#b8efcf;color:#14532d;border-color:#2eaa63}.guest-choices button:disabled{opacity:.78;cursor:default}.status{min-height:1.5rem;margin:20px 0 0;color:#526886}.status[data-type=error]{color:#a22035}.status[data-type=success]{color:#217347}
 [hidden]{display:none!important}.wait{text-align:center}.count{font-size:28px;font-weight:800}
 .random-name{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px;background:#f2f6ff;border:1px solid #dbe5f5;border-radius:12px}.name-display{font-size:1.15rem;font-weight:800;flex:1;min-width:160px}.random-name button{font-size:.89rem;padding:10px 12px}.random-name button:disabled{opacity:.55}
 </style><script defer src="/cloud-names.js"></script><script defer src="/join.js"></script></head><body>
 <main><div class="logo">Quizzz<span>!!!</span></div>
 <section id="join-section" class="card"><h1>¡Entra a jugar!</h1>
-<p class="hint">Acceso de prueba mediante invitación del formador. Las preguntas todavía no están habilitadas.</p>
+<p class="hint">Escanea el QR, elige tu nombre divertido y participa desde el móvil.</p>
 <form id="join-form">
 <p id="qr-instructions" class="hint" hidden>Has llegado escaneando el QR. ¡Tu PIN ya está preparado!</p>
 <label for="pin">PIN de la sala</label><input id="pin" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" required placeholder="123456">
@@ -28,6 +28,12 @@ button:disabled{opacity:.65;cursor:wait}.full{width:100%;margin-top:25px}.hint{c
 <section id="waiting-section" class="card wait" hidden>
 <h1>¡Ya estás dentro!</h1><p id="welcome" class="hint"></p><p class="count" id="participant-count"></p>
 <p id="waiting-text" class="hint">Esperando al formador…</p>
+<section id="guest-game" hidden aria-label="Pregunta de la partida">
+<p id="guest-question-step" class="hint"></p><h2 id="guest-question-text"></h2>
+<p id="guest-question-time" class="hint"></p>
+<div id="guest-question-options" class="guest-choices"></div>
+<p id="guest-question-message" class="status" role="status" aria-live="polite"></p>
+</section>
 <button id="leave" type="button">Salir de la sala</button>
 <p id="waiting-status" class="status" aria-live="polite" role="status"></p></section>
 <p class="hint">Quizzz! · Vista previa protegida. No compartas el enlace fuera del grupo de pruebas.</p>
