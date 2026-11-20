@@ -66,8 +66,7 @@
     $('guest-private-media-status').hidden = true;
   }
   async function loadPrivateMedia(media, index) {
-    if (!token || !['image','video'].includes(media?.type) ||
-        privateMediaIndex === index) return;
+    if (!token || privateMediaIndex === index) return;
     clearPrivateMedia();
     privateMediaIndex = index;
     const seq = privateMediaSequence;
@@ -80,10 +79,14 @@
         body: JSON.stringify({ token }),
         cache: 'no-store',
       });
+      if (response.status === 403) {
+        $('guest-private-media-status').hidden = true;
+        return;
+      }
       if (!response.ok) throw Error('media_unavailable');
       const data = await response.json();
       if (seq !== privateMediaSequence || data?.ok !== true ||
-          data.type !== media.type || data.index !== index) return;
+          !['image','video'].includes(data.type) || data.index !== index) return;
       const u = new URL(data.url);
       if (u.protocol !== 'https:' ||
           !u.hostname.endsWith('.supabase.co') ||
@@ -346,6 +349,8 @@
       $('guest-question-options').replaceChildren();
       resetPersonalFeedback();
       clearPrivateMedia();
+      // La RPC de estado del invitado no revela rutas privadas; el servidor decide
+      // si la pregunta activa contiene una imagen o vídeo autorizados.
       if (phase === 'question') void loadPrivateMedia(question.media, question.index);
     }
     const revealing = phase === 'reveal';
