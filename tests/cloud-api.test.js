@@ -603,3 +603,50 @@ test('cierre de salas filtra por propietario y no permite modificar otras column
     });
   }
 });
+
+test('host puede abrir una sala propia por RPC y listar jugadores sin token secreto', async () => {
+  const keys = ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'];
+  const before = keys.map(key => process.env[key]);
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const roomId = 'd5f47ca1-a416-43a3-8341-6dffca530f3f';
+  const calls = [];
+  const fake = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    if (String(url).includes('/rpc/quiz_host_open_room')) return mock(true);
+    if (String(url).includes('/quiz_rooms?')) return mock([{
+      id: roomId, quiz_id: 'ac16f472-f345-469e-8f24-5d978073a79b',
+      pin: '643287', join_secret: '65e74e9e-c977-4a08-86fa-f3517cb997b0',
+      is_joinable: false, status: 'waiting',
+    }]);
+    if (String(url).includes('/quiz_room_players?')) return mock([{ id: roomId, nickname: 'Laura' }]);
+    throw Error('Unknown request');
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const headers = { Authorization: 'Bearer test.jwt.signature' };
+      const endpoint = base + '/api/cloud/rooms/' + roomId + '/open';
+      assert.equal((await fetch(endpoint, { method: 'POST' })).status, 401);
+      const result = await fetch(endpoint, { method: 'POST', headers });
+      assert.equal(result.status, 200);
+      const body = await result.json();
+      assert.equal(body.is_joinable, true);
+      assert.equal(body.join_secret, '65e74e9e-c977-4a08-86fa-f3517cb997b0');
+      const rpc = calls.find(call => call.url.endsWith('/rpc/quiz_host_open_room'));
+      assert.equal(JSON.parse(rpc.options.body).p_room_id, roomId);
+      assert.equal(rpc.options.headers.Authorization, 'Bearer test.jwt.signature');
+      const lookup = calls.find(call => call.url.includes('/quiz_rooms?'));
+      assert.ok(lookup.url.includes('owner_id=eq.' + USER));
+      const players = await fetch(base + '/api/cloud/rooms/' + roomId + '/players', { headers });
+      assert.equal(players.status, 200);
+      assert.deepEqual(await players.json(), [{ id: roomId, nickname: 'Laura' }]);
+      const playerRead = calls.find(call => call.url.includes('/quiz_room_players?'));
+      assert.ok(playerRead.url.includes('owner_id=eq.' + USER));
+      assert.equal(playerRead.url.includes('token_digest'), false);
+    });
+  } finally {
+    keys.forEach((key, i) => { if (before[i] === undefined) delete process.env[key]; else process.env[key] = before[i]; });
+  }
+});
