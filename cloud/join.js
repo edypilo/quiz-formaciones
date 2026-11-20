@@ -170,7 +170,8 @@
         $('waiting-text').textContent = 'La sala ha cerrado.';
         message('waiting-status', 'Ya puedes salir de esta pantalla.');
       } else {
-        $('waiting-text').textContent = 'Esperando al formador…';
+        if (result.game_phase === 'lobby' || !result.game_phase)
+          $('waiting-text').textContent = 'Esperando al formador…';
         message('waiting-status', 'Conexión comprobada.', 'success');
       }
     } catch {
