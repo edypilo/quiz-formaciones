@@ -124,3 +124,69 @@ test('pantalla de invitados contempla los cuatro resultados y evita consultar an
   assert.match(html,/aria-live="polite"/);
   assert.match(html,/prefers-reduced-motion/);
 });
+
+test('presentador separado: funciones privadas y distribución de votos solo en revelación',()=>{
+  const sql=fs.readFileSync(path.join(__dirname,'../supabase/migrations/202611200004_quiz_presenter.sql'),'utf8');
+  assert.match(sql,/create or replace function public\.quiz_host_presenter_state\(p_room_id uuid\)/);
+  assert.match(sql,/create or replace function public\.quiz_host_reveal_due\(p_room_id uuid\)/);
+  assert.match(sql,/create or replace function public\.quiz_guest_standing\(p_token uuid\)/);
+  assert.match(sql,/r\.owner_id = \(select auth\.uid\(\)\)/);
+  assert.match(sql,/case when v_room\.game_phase='reveal'/);
+  assert.match(sql,/question_ends_at <= clock_timestamp\(\)/);
+  assert.match(sql,/v_room\.game_phase not in \('reveal','finished'\)/);
+  assert.match(sql,/revoke execute on function public\.quiz_host_presenter_state/);
+  assert.match(sql,/revoke execute on function public\.quiz_guest_standing/);
+  assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+  assert.equal((sql.match(/\$\$/g)||[]).length,6);
+});
+test('móvil recibe formas y puesto sin consultar clasificación antes de mostrar resultado',()=>{
+  const js=fs.readFileSync(path.join(__dirname,'../cloud/join.js'),'utf8');
+  const html=fs.readFileSync(path.join(__dirname,'../cloud/join.html'),'utf8');
+  assert.match(js,/const shapes = \['▲','◆','●','■'\]/);
+  assert.match(js,/rpc\('quiz_guest_standing', \{ p_token: token \}\)/);
+  assert.match(js,/currentQuestionKey.endsWith\(':reveal'\)/);
+  assert.match(js,/if \(phase === 'finished'\)/);
+  assert.match(html,/id="guest-final"/);
+  for(const name of ['c0','c1','c2','c3'])assert.match(html,new RegExp('\\.'+name));
+});
+test('presentador usa token transmitido por origen verificado sin incluirlo en URL',()=>{
+  const admin=fs.readFileSync(path.join(__dirname,'../cloud/admin.js'),'utf8');
+  const js=fs.readFileSync(path.join(__dirname,'../cloud/presenter.js'),'utf8');
+  assert.match(admin,/presenterWindows\.get\(roomId\) !== event\.source/);
+  assert.match(admin,/event\.origin !== window\.location\.origin/);
+  assert.match(js,/e\.origin !== location\.origin \|\| e\.source !== window\.opener/);
+  assert.match(js,/quizzz:presenter-auth-request/);
+  assert.match(js,/setInterval\(\(\)=>\{if\(!document\.hidden\)void refresh\(\);\},1000\)/);
+  assert.match(js,/hostCommand\('auto-reveal'\)/);
+  assert.match(js,/const shapes = \['▲', '◆', '●', '■'\]/);
+});
+test('estado agregado exige autorización y bloqueo correcto por rol',async()=>{
+  const keys=['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'];
+  const old=keys.map(k=>process.env[k]);
+  process.env.SUPABASE_URL='https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY='sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const calls=[];
+  try{
+    await api(async(url,options)=>{
+      calls.push(String(url));
+      if(String(url).endsWith('/auth/v1/user'))return mock({id:userId});
+      if(String(url).endsWith('/rpc/quiz_host_presenter_state'))return mock({ok:true,phase:'question',player_count:3,answered_count:2});
+      if(String(url).endsWith('/rpc/quiz_host_reveal_due'))return mock({ok:true,changed:true,phase:'reveal'});
+      throw Error('Unexpected URL');
+    },async base=>{
+      for(const [action,expected] of [['presenter','question'],['auto-reveal','reveal']]){
+        const uri=base+'/api/cloud/rooms/'+roomId+'/'+action;
+        assert.equal((await fetch(uri,{method:'POST'})).status,401);
+        const res=await fetch(uri,{method:'POST',headers:{Authorization:'Bearer test.jwt.signature'}});
+        assert.equal(res.status,200);
+        const body=await res.json();
+        assert.equal(body.phase,expected);
+      }
+    });
+    assert.ok(calls.some(x=>x.endsWith('/rpc/quiz_host_presenter_state')));
+    assert.ok(calls.some(x=>x.endsWith('/rpc/quiz_host_reveal_due')));
+  }finally{
+    keys.forEach((key,i)=>{if(old[i]===undefined)delete process.env[key];else process.env[key]=old[i];});
+  }
+});
