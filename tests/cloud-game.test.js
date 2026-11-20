@@ -156,7 +156,8 @@ test('presentador usa token transmitido por origen verificado sin incluirlo en U
   assert.match(admin,/event\.origin !== window\.location\.origin/);
   assert.match(js,/e\.origin !== location\.origin \|\| e\.source !== window\.opener/);
   assert.match(js,/quizzz:presenter-auth-request/);
-  assert.match(js,/setInterval\(\(\)=>\{if\(!document\.hidden\)void refresh\(\);\},1000\)/);
+  assert.match(js,/!live\?\.isLive\(\)/);
+  assert.match(js,/if \(!document\.hidden\) void refresh\(\)/);
   assert.match(js,/hostCommand\('auto-reveal'\)/);
   assert.match(js,/const shapes = \['▲', '◆', '●', '■'\]/);
 });
