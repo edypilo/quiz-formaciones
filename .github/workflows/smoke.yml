@@ -19,4 +19,6 @@ jobs:
       - run: node --check cloud/admin.js
       - run: node --check cloud/join.js
       - run: node --check cloud/names.js
+      - run: node --check cloud/effects.js
+      - run: node --check cloud/presentation.js
       - run: node --test tests/*.test.js
