@@ -90,7 +90,10 @@ function confetti({ duration = 4000, count = 220, colors } = {}) {
     getComputedStyle(document.documentElement).getPropertyValue('--secondary').trim() || '#00A8A8'];
   const canvas = document.createElement('canvas');
   canvas.className = 'confetti';
-  document.body.appendChild(canvas);
+  // Un <dialog> modal se dibuja en la capa superior del navegador.
+  // El confeti debe vivir dentro de él para no quedar oculto por el backdrop.
+  const presentation = document.getElementById('game-presentation-dialog');
+  (presentation?.open ? presentation : document.body).appendChild(canvas);
   const g = canvas.getContext('2d');
   const resize = () => { canvas.width = innerWidth * devicePixelRatio; canvas.height = innerHeight * devicePixelRatio; };
   resize();
