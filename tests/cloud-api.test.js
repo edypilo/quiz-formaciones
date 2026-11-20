@@ -691,3 +691,43 @@ test('QR protegido requiere JWT y acepta solo URL de invitación de este host', 
     keys.forEach((key,i) => { if (old[i] === undefined) delete process.env[key]; else process.env[key] = old[i]; });
   }
 });
+
+test('listado agrupado de participantes exige JWT, filtra propietario y limita salas', async () => {
+  const keys = ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY'];
+  const saved = keys.map(key => process.env[key]);
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const room1 = 'd5f47ca1-a416-43a3-8341-6dffca530f3f';
+  const room2 = '65e74e9e-c977-4a08-86fa-f3517cb997b0';
+  let readUrl = '';
+  const fake = async (url) => {
+    if (String(url).endsWith('/auth/v1/user')) return mock({ id: USER });
+    readUrl = String(url);
+    return mock([{ id: USER, room_id: room1, nickname: 'Koala Feliz', joined_at: '2026-11-20T10:00:00Z' }]);
+  };
+  try {
+    await withApi(fake, {}, async (base) => {
+      const route = base + '/api/cloud/rooms/players';
+      assert.equal((await fetch(route + '?ids=' + room1)).status, 401);
+      const headers = { Authorization: 'Bearer test.jwt.signature' };
+      assert.equal((await fetch(route + '?ids=bad', { headers })).status, 400);
+      assert.equal((await fetch(route + '?ids=' + Array(7).fill(room1).join(','), { headers })).status, 400);
+      assert.equal((await fetch(route + '?ids=' + room1 + ',' + room1, { headers })).status, 400);
+      const result = await fetch(route + '?ids=' + room1 + ',' + room2, { headers });
+      assert.equal(result.status, 200);
+      const players = await result.json();
+      assert.equal(players.length, 1);
+      assert.equal(players[0].nickname, 'Koala Feliz');
+      assert.ok(readUrl.includes('/quiz_room_players?'));
+      assert.ok(readUrl.includes('owner_id=eq.' + USER));
+      assert.ok(readUrl.includes('room_id=in.'));
+      assert.equal(readUrl.includes('token_digest'), false);
+      assert.ok(readUrl.includes('limit=360'));
+    });
+  } finally {
+    keys.forEach((key, i) => {
+      if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i];
+    });
+  }
+});
