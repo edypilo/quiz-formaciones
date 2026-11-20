@@ -88,3 +88,39 @@ test('migración de motor mantiene funciones separadas, índices únicos y respu
   assert.equal((sql.match(/create or replace function public\.quiz_guest_status/g)||[]).length,1);
   assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
 });
+
+test('feedback de cada jugador se calcula solo en revelación usando su propio token',()=>{
+  const sql=fs.readFileSync(path.join(__dirname,'../supabase/migrations/202611200003_quiz_guest_feedback.sql'),'utf8');
+  assert.match(sql,/create or replace function public\.quiz_guest_feedback\(p_token uuid\)/);
+  assert.match(sql,/p\.token_digest = extensions\.digest\(p_token::text, 'sha256'\)/);
+  assert.match(sql,/v_room\.game_phase <> 'reveal'/);
+  assert.match(sql,/a\.player_id = v_player_id/);
+  assert.match(sql,/a\.question_index = v_room\.game_question_index/);
+  assert.match(sql,/'outcome', 'unanswered', 'points', 0, 'selected', null/);
+  assert.match(sql,/v_selected = v_correct/);
+  assert.match(sql,/v_outcome := 'participated'/);
+  assert.match(sql,/'points', coalesce\(v_score, 0\)/);
+  assert.doesNotMatch(sql,/grant (select|update|delete|insert) on public\.quiz_room_answers to anon/);
+  assert.equal((sql.match(/create or replace function public\.quiz_guest_feedback/g)||[]).length,1);
+  assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+  assert.equal((sql.match(/\$\$/g)||[]).length,2);
+});
+
+test('pantalla de invitados contempla los cuatro resultados y evita consultar antes de revelar',()=>{
+  const js=fs.readFileSync(path.join(__dirname,'../cloud/join.js'),'utf8');
+  const html=fs.readFileSync(path.join(__dirname,'../cloud/join.html'),'utf8');
+  assert.match(js,/phase === 'reveal'/);
+  assert.match(js,/rpc\('quiz_guest_feedback', \{ p_token: token \}\)/);
+  assert.match(js,/currentQuestionKey !== key/);
+  assert.match(js,/feedbackCompletedKey !== key/);
+  assert.match(js,/feedbackPendingKey === key/);
+  for(const outcome of ['correct','incorrect','unanswered','participated']){
+    assert.ok(js.includes(outcome));
+  }
+  for(const id of ['guest-feedback','guest-feedback-title','guest-feedback-message',
+                   'guest-feedback-points','guest-feedback-present']){
+    assert.ok(html.includes('id="'+id+'"'));
+  }
+  assert.match(html,/aria-live="polite"/);
+  assert.match(html,/prefers-reduced-motion/);
+});
