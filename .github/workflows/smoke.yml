@@ -1,0 +1,27 @@
+name: Node.js smoke tests
+on:
+  pull_request:
+  push:
+    branches: [main, feat/vercel-cloud]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --omit=optional --no-audit --no-fund
+      - run: node --check server.js
+      - run: node --check iniciar.js
+      - run: node --check cloud/api.js
+      - run: node --check cloud/admin.js
+      - run: node --check cloud/join.js
+      - run: node --check cloud/names.js
+      - run: node --check cloud/effects.js
+      - run: node --check cloud/presentation.js
+      - run: node --check cloud/presenter.js
+      - run: node --check cloud/realtime-host.js
+      - run: node --check cloud/realtime-guest.js
+      - run: node --test tests/*.test.js

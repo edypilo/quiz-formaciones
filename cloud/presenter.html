@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Quizzz! · Presentador</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#1b3262;background:#ebf2ff;color-scheme:light}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(circle at 10% 5%,#d9e9ff,transparent 38%),radial-gradient(circle at 90% 90%,#fff0cb,transparent 35%),#f5f8ff}
+[hidden]{display:none!important}button{border:0;border-radius:12px;background:#315cce;color:white;padding:12px 22px;font:inherit;font-weight:800;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}.muted{color:#567099}.brand{font-size:clamp(25px,3vw,38px);font-weight:900;color:#6989e6;letter-spacing:-1px}.brand span{color:#f1bb2d}
+header{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;padding:14px clamp(18px,4vw,55px);background:#ffffffea;border-bottom:3px solid #f1bb2d}
+header .controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+main{max-width:1450px;margin:auto;padding:24px clamp(15px,3vw,45px)}section.screen{min-height:68vh}.surface{background:#fff;border:1px solid #d9e5f8;border-radius:24px;padding:clamp(18px,3vw,35px);box-shadow:0 9px 40px #17356012}
+h1{font-size:clamp(28px,5.5vw,62px);line-height:1.12;margin:10px 0 18px}h2{font-size:clamp(22px,3vw,39px);margin:8px 0 18px}
+.status{margin:10px 0;min-height:24px;color:#4b6791}.status[data-error=true]{color:#bd2b47}
+.lobby{display:grid;grid-template-columns:minmax(230px,410px) 1fr;gap:clamp(14px,3vw,40px);align-items:start}
+.qr-panel{text-align:center}.qr-panel img{display:block;width:min(100%,350px);height:auto;margin:10px auto}.pin{font-size:clamp(40px,6vw,80px);font-weight:950;letter-spacing:.12em;color:#2754bc}
+.people{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}.person{padding:9px 14px;border-radius:100px;background:#eaf0ff;border:1px solid #c8d9f5;font-weight:750;font-size:clamp(15px,1.5vw,20px)}
+.counter{font-size:clamp(23px,3.2vw,39px);font-weight:850;color:#234bb0}.footer-controls{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:22px 0}
+.qtop{display:flex;justify-content:space-between;gap:18px;align-items:center;flex-wrap:wrap}.question{background:#fff;text-align:center;margin:24px 0;padding:30px;border-radius:23px;border:1px solid #dae5f8;font-size:clamp(26px,4.2vw,56px);font-weight:880;line-height:1.2}
+.timer{font-size:clamp(40px,5.8vw,78px);font-weight:950;color:#285ac7;background:#fff;border:3px solid #a7bff3;border-radius:50%;width:120px;height:120px;display:grid;place-items:center}.received{font-size:clamp(22px,3vw,38px);font-weight:800}.presenter-media{max-width:880px;margin:0 auto 22px;text-align:center}.presenter-media img,.presenter-media video{max-height:40vh;max-width:100%;object-fit:contain;border-radius:16px;box-shadow:0 6px 22px #17356022}.presenter-media iframe{display:block;width:min(100%,760px);aspect-ratio:16/9;border:0;border-radius:16px;margin:auto}.presenter-media-status{text-align:center;margin:8px auto 16px}.presenter-media[hidden]{display:none!important}.answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(10px,1.8vw,20px)}
+.answer{min-height:120px;border-radius:18px;padding:22px;display:flex;gap:20px;align-items:center;color:#fff;font-size:clamp(19px,2.4vw,35px);font-weight:850;transition:opacity .3s,transform .3s;overflow-wrap:anywhere}
+.answer .shape{font-size:1.4em;flex:0 0 1.6em;text-align:center}.answer.c0{background:#e0374b}.answer.c1{background:#226cd3}.answer.c2{background:#c38b08}.answer.c3{background:#289046}
+.answer.dim{opacity:.3}.answer.correct{outline:5px solid #15b86e;transform:scale(1.015)}
+.bars{display:flex;align-items:end;justify-content:center;gap:20px;height:160px;margin:18px auto}.bar{flex:1;max-width:160px;border-radius:12px 12px 0 0;min-height:28px;display:flex;justify-content:center;align-items:start;padding:10px;font-size:24px;font-weight:850;color:#fff}.bar.c0{background:#e0374b}.bar.c1{background:#226cd3}.bar.c2{background:#c38b08}.bar.c3{background:#289046}
+.explanation{font-size:clamp(18px,2vw,28px);text-align:center;background:#fff6df;border-radius:15px;padding:14px;margin:15px 0}
+.board{position:relative;max-width:900px;margin:22px auto;overflow:hidden}.rank-row{position:absolute;top:0;left:0;right:0;height:70px;display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #d8e2f6;border-radius:15px;padding:10px 18px;font-size:clamp(14px,2.3vw,26px);font-weight:800;transition:transform .85s cubic-bezier(.2,.8,.2,1)}
+.rank-pos{width:32px;text-align:center}.rank-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rank-gain{min-width:70px;color:#138b50}.rank-score{min-width:105px;text-align:right;font-variant-numeric:tabular-nums}
+.stage{display:flex;align-items:flex-end;justify-content:center;gap:clamp(8px,3vw,40px);min-height:460px;margin-top:20px}.place{width:min(29%,285px);text-align:center;display:flex;flex-direction:column;align-items:center}.avatar{font-size:clamp(54px,8vw,100px);opacity:0}.place-name{font-size:clamp(14px,2.1vw,28px);font-weight:900;opacity:0}.place-score{font-size:clamp(13px,1.4vw,20px);margin:8px;opacity:0}.pedestal{height:160px;width:100%;display:grid;place-items:start center;padding:18px;border-radius:15px 15px 0 0;transform:scaleY(0);transform-origin:bottom;font-size:50px;font-weight:900;color:#193c7777}.place-1 .pedestal{height:310px;background:linear-gradient(#ffe88a,#e0ab12)}.place-2 .pedestal{height:240px;background:linear-gradient(#f0f2f6,#aeb6c3)}.place-3 .pedestal{height:175px;background:linear-gradient(#f0c49d,#c77c46)}.place.show .pedestal{transform:scaleY(1);transition:transform .75s}.place.show .avatar{animation:drop .7s both}.place.show .place-name,.place.show .place-score{opacity:1;transition:opacity .5s .7s}
+@keyframes drop{from{transform:translateY(-45vh) scale(.7);opacity:0}to{transform:none;opacity:1}}canvas.confetti{position:fixed;inset:0;pointer-events:none;width:100vw;height:100vh;z-index:99}
+@media(max-width:750px){.lobby{grid-template-columns:1fr}.answers{grid-template-columns:1fr}.answer{min-height:70px}.timer{width:82px;height:82px}.rank-gain{min-width:48px}.rank-score{min-width:70px}.stage{min-height:320px}.place-1 .pedestal{height:205px}.place-2 .pedestal{height:160px}.place-3 .pedestal{height:115px}}
+@media(prefers-reduced-motion:reduce){.rank-row{transition:none!important}.place.show .pedestal,.place.show .place-name,.place.show .place-score{transition:none}.place.show .avatar{animation:none;opacity:1}}
+</style>
+<script src="/cloud-names.js" defer></script><script src="/cloud-effects.js" defer></script><script src="/cloud-realtime-host.js" defer></script><script src="/presenter.js" defer></script>
+</head><body>
+<header><div class="brand">Quizzz<span>!!!</span></div><div class="controls"><span id="connection-mode" class="muted" role="status" aria-live="polite">Conectando…</span><strong id="room-title">Preparando sala</strong><button id="fullscreen" type="button">⛶ Pantalla completa</button></div></header>
+<main>
+<p id="status" class="status" role="status" aria-live="polite">Conectando con el panel del formador…</p>
+<section id="lobby" class="screen" hidden>
+<div class="lobby">
+<div class="surface qr-panel"><h2>Escanea y participa</h2><img id="qr" alt="QR para unirse a Quizzz!"><div>PIN</div><div id="pin" class="pin"></div><p class="muted">Tu nombre se asignará automáticamente al entrar.</p></div>
+<div class="surface"><h1>¡La sala se está llenando!</h1><div id="player-count" class="counter">0 participantes</div><div id="players" class="people" aria-live="polite"></div>
+<div class="footer-controls"><button id="start" type="button" disabled>▶ Iniciar partida</button></div>
+<p class="muted">La lista se actualiza automáticamente. Mira la pantalla para seguir el juego.</p></div></div></section>
+<section id="question-screen" class="screen" hidden>
+<div class="qtop"><div><h2 id="step">Pregunta</h2><div id="responses" class="received">0 respuestas</div></div><div id="timer" class="timer">0</div></div>
+<div id="question" class="question"></div><div id="presenter-media" class="presenter-media" hidden aria-label="Contenido multimedia de la pregunta"></div><p id="presenter-media-status" class="muted" role="status" hidden></p><div id="answers" class="answers"></div>
+<div id="distribution" class="bars" hidden></div><div id="explanation" class="explanation" hidden></div>
+<div class="footer-controls"><button id="ranking-button" hidden type="button">Ver clasificación ▶</button></div>
+</section>
+<section id="ranking-screen" class="screen" hidden><h1 style="text-align:center">Clasificación</h1><div id="board" class="board" role="list"></div><p id="other-players" class="muted" style="text-align:center"></p><div class="footer-controls"><button id="next" type="button">Siguiente pregunta ▶</button></div></section>
+<section id="podium-screen" class="screen" hidden><h1 id="podium-title" style="text-align:center">Y el ganador es…</h1><div id="stage" class="stage"></div><p class="muted" style="text-align:center">¡Gracias por participar en Quizzz!</p><div class="footer-controls"><button id="replay" type="button">↻ Repetir podio</button></div></section>
+</main></body></html>

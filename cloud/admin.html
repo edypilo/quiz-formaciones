@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Quizzz! · Acceso de administración (Preview)</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17284d;background:#f5f8ff;color-scheme:light}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100dvh;background:radial-gradient(circle at 8% 8%,#d5e7ff 0,transparent 34%),radial-gradient(circle at 90% 85%,#fff1cc 0,transparent 27%),#f7f9fe}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1120px;margin:auto;padding:30px 20px}
+    .brand{font-weight:900;letter-spacing:-1.5px;font-size:clamp(25px,3.5vw,34px)}
+    .brand .q{color:#6989e6}.brand .z{color:#efa6a4}.brand .marks{color:#f2bc38}
+    .pill{font-size:.78rem;font-weight:750;letter-spacing:.05em;padding:8px 14px;border-radius:30px;background:#fff0bd;color:#664912}
+    main{max-width:1120px;margin:auto;padding:24px 20px 60px}
+    .intro{margin:0 0 28px;max-width:650px}.intro h1{font-size:clamp(28px,5vw,46px);line-height:1.15;margin:0 0 12px;letter-spacing:-.04em}
+    .intro p{color:#56647e;line-height:1.6;margin:0}
+    .card{max-width:530px;background:#fff;padding:clamp(20px,4vw,38px);border:1px solid #e2e8f5;border-radius:24px;box-shadow:0 16px 55px #253d7013}
+    .card h2{margin:0 0 8px;font-size:1.5rem}.hint{margin:0 0 25px;color:#60708a;line-height:1.55}
+    label{display:block;margin:18px 0 8px;font-weight:700;font-size:.93rem}
+    input{display:block;width:100%;border:1.5px solid #d6deed;border-radius:12px;padding:14px 15px;font:inherit;outline-offset:2px;background:#fff;color:#182747}
+    input:focus-visible{outline:2px solid #597fe0;border-color:#597fe0}
+    button{appearance:none;border:0;border-radius:13px;padding:13px 22px;font:inherit;font-weight:750;cursor:pointer;background:#315cce;color:#fff}
+    button:hover:not(:disabled){background:#2449ac}
+    button:disabled{opacity:.6;cursor:wait}
+    .full{width:100%;margin-top:24px}
+    .minor{background:#fff;border:1px solid #d7e0f1;color:#243d83}
+    .minor:hover:not(:disabled){background:#f1f5ff}
+    .status{min-height:22px;margin:18px 0 0;font-size:.95rem;color:#4e6078}
+    .status[data-type=error]{color:#a31f38}
+    .status[data-type=success]{color:#236c41}
+    [hidden]{display:none !important}
+    .toolbar{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 22px}
+    .toolbar h2{margin:0}.toolbar .hint{margin:5px 0 0}
+    .columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+    .list-card{background:#fff;border-radius:22px;border:1px solid #e2e8f5;padding:24px;min-width:0}
+    .list-card h3{margin:0 0 16px}
+    .items{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+    .items li{padding:12px 15px;border-radius:11px;background:#f4f7fc;border:1px solid #e6ecf7}
+    .items .name{font-weight:750;display:block;overflow-wrap:anywhere}.items .sub{display:block;color:#52627e;margin-top:3px;font-size:.88rem}
+    .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px}.actions button{font-size:.9rem;padding:10px 14px}.project-row{display:flex;justify-content:space-between;gap:10px;align-items:center}.project-row button{font-size:.78rem;padding:7px 10px;flex-shrink:0}.project-form{max-width:none;margin-bottom:25px}.project-form .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}.project-form .fields label{margin-top:12px}.project-form .buttons{display:flex;align-items:center;gap:10px;margin-top:18px}.question-options{display:grid;gap:10px;margin:16px 0}.question-option{display:flex;align-items:center;gap:10px}.question-option input[type=text]{flex:1;min-width:0}.question-option input[type=checkbox]{width:20px;height:20px;flex-shrink:0}.project-form select,.project-form textarea{width:100%;border:1.5px solid #d6deed;border-radius:12px;padding:12px;font:inherit;background:white;color:#182747}.project-form input[type=checkbox]{display:inline-block;width:auto;margin-right:8px}.question-option input[type=checkbox]{width:20px}.question-nav-row{display:flex;gap:8px;align-items:stretch}.question-nav-row .minor{padding:7px 12px;flex-shrink:0}.question-nav-row .question-card{flex:1;min-width:0}.question-card{width:100%;display:flex;gap:10px;justify-content:space-between;text-align:left;background:#f1f5fe;color:#193264;border:1px solid #d5dff3;margin:5px 0}.question-card:hover{background:#e5edfe}.question-card[aria-current=true]{outline:2px solid #315cce}.media-editor{padding:16px;border:1px solid #d9e2f3;border-radius:14px;background:#f7f9fe;margin:16px 0}.media-editor p{margin:0 0 12px}.media-editor .media-preview{display:flex;align-items:flex-start;flex-direction:column;gap:10px}.media-editor img,.media-editor video{max-width:100%;max-height:250px;object-fit:contain;border-radius:8px}.media-editor a{overflow-wrap:anywhere}.media-editor input[type=url]{flex:1;min-width:190px}.media-editor .actions button{white-space:nowrap}.media-editor .media-preview button.media-zoom{background:transparent;padding:0;border:0;cursor:zoom-in}.media-editor .media-preview button.media-zoom:hover{background:transparent}.media-editor .media-preview button.media-zoom img{display:block}#media-lightbox{width:min(94vw,1100px);max-height:94vh;border:0;border-radius:16px;padding:16px;background:#fff;box-shadow:0 20px 100px #0006}#media-lightbox::backdrop{background:#091735bf}#media-lightbox .lightbox-top{display:flex;justify-content:flex-end;margin-bottom:12px}#media-lightbox img{display:block;max-width:100%;max-height:calc(94vh - 88px);margin:auto;object-fit:contain}#room-qr-dialog{width:min(94vw,640px);max-height:94dvh;border:0;border-radius:20px;padding:24px;box-shadow:0 20px 100px #0007;background:white;color:#17284d}#room-qr-dialog::backdrop{background:#0c1d40c9}.room-qr-content{text-align:center}.room-qr-content img{display:block;width:min(100%,340px);height:auto;margin:8px auto}.room-qr-pin{font-size:clamp(36px,7vw,64px);font-weight:900;letter-spacing:.15em;margin:10px 0 20px;color:#315cce}.room-qr-content .hint{margin:9px 0;line-height:1.4}.room-participants{margin:12px 0 0;padding:10px;border-radius:10px;background:#f5f8ff;border:1px solid #e1e9f6;font-size:.9rem;color:#52627e;line-height:1.5}.room-participants strong{display:block;color:#193264;margin:0 0 5px}.room-participants ul{padding:0;margin:0;list-style:none;display:flex;gap:6px;flex-wrap:wrap}.room-participants li,.room-qr-names span{display:inline-block;background:#eaf0ff;color:#243c78;border-radius:10px;padding:5px 8px;overflow-wrap:anywhere}.room-qr-attendees{margin:12px 0 20px}.room-qr-count{font-size:1.3rem;color:#16336e}.room-qr-names{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px;max-height:230px;overflow:auto;text-align:left}.room-qr-names span{font-weight:700;font-size:1rem;padding:9px 13px}.game-correct{border:2px solid #38ab6f!important;background:#e7f8ed!important}.game-choice{display:block;padding:12px;background:#f0f5ff;border:1px solid #d5e0f5;border-radius:10px;color:#1d3671;overflow-wrap:anywhere}.footer{font-size:.82rem;color:#71809b;margin-top:30px;line-height:1.55}
+    @media(max-width:720px){.columns,.project-form .fields{grid-template-columns:1fr}.toolbar{align-items:stretch}.intro{margin-bottom:22px}}
+
+    /* Animaciones de clasificación y podio adaptadas de la versión de escritorio. */
+    #game-presentation-dialog{border:0;border-radius:22px;padding:clamp(16px,3vw,32px);width:min(97vw,1200px);max-width:97vw;max-height:96dvh;overflow:auto;color:#173260;background:radial-gradient(circle at 10% 12%,#e2edff,transparent 45%),linear-gradient(155deg,#fff,#fff7e4);box-shadow:0 28px 90px #0007}
+    #game-presentation-dialog::backdrop{background:#091837d9}
+    .cloud-presentation-head{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}
+    .cloud-presentation-logo{font-size:clamp(20px,3vw,31px);font-weight:900;color:#6888e3}.cloud-presentation-logo span{color:#f2bc38}
+    .cloud-screen-title{text-align:center;font-size:clamp(28px,5vw,58px);margin:15px auto 8px;color:#18356e}
+    .cloud-screen-subtitle{text-align:center;color:#516788;margin:8px 0 20px}
+    .cloud-ranking-board{position:relative;max-width:850px;margin:0 auto 12px;overflow:hidden}
+    .cloud-rrow{position:absolute;top:0;left:0;right:0;height:66px;display:flex;align-items:center;gap:12px;border-radius:15px;padding:8px 18px;font-size:clamp(14px,2.2vw,24px);font-weight:750;background:#fff;border:1px solid #d9e4f9;box-shadow:0 4px 16px #17326011}
+    .cloud-rrow.moving{transition:transform .95s cubic-bezier(.2,.8,.2,1),opacity .55s}
+    .cloud-rrow.done:first-child{background:#e7f0ff;border-color:#7599eb}
+    .cloud-rpos{font-weight:900;width:33px;text-align:center}.cloud-rname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .cloud-rmove{width:52px;text-align:center}.cloud-rmove[data-direction=up]{color:#148953}.cloud-rmove[data-direction=down]{color:#ca4655}
+    .cloud-rgain{color:#138b50;font-size:.84em;min-width:65px;text-align:right}.cloud-rscore{font-variant-numeric:tabular-nums;min-width:94px;text-align:right}
+    .cloud-presentation-footer{display:flex;justify-content:center;gap:12px;margin-top:20px}
+    .cloud-podium-stage{display:flex;justify-content:center;align-items:flex-end;gap:clamp(8px,3vw,34px);min-height:clamp(310px,54vh,560px);max-width:920px;margin:16px auto}
+    .cloud-place{min-width:0;width:min(29%,265px);display:flex;flex-direction:column;align-items:center;text-align:center}
+    .cloud-avatar{position:relative;display:grid;place-items:center;width:clamp(67px,11vw,146px);aspect-ratio:1;background:#fff;border-radius:50%;box-shadow:0 10px 22px #132c5c33;margin:0 0 12px;opacity:0}
+    .cloud-animal{font-size:clamp(35px,6.5vw,85px)}.cloud-medal{position:absolute;right:-9px;bottom:-7px;font-size:clamp(26px,4vw,50px)}
+    .cloud-pname{font-size:clamp(12px,1.8vw,23px);font-weight:850;overflow-wrap:anywhere;opacity:0}
+    .cloud-pscore{font-weight:700;margin:8px 0;font-size:clamp(12px,1.4vw,18px);opacity:0}
+    .cloud-pedestal{width:100%;display:flex;justify-content:center;padding-top:13px;border-radius:14px 14px 0 0;transform:scaleY(0);transform-origin:bottom;font-size:clamp(33px,5vw,74px);font-weight:950;color:#17326077;box-shadow:inset 0 9px 0 #fff7}
+    .cloud-place-1 .cloud-pedestal{height:clamp(150px,31vh,315px);background:linear-gradient(#ffeb85,#e4af10)}
+    .cloud-place-2 .cloud-pedestal{height:clamp(120px,23vh,242px);background:linear-gradient(#eff2f8,#aeb7cc)}
+    .cloud-place-3 .cloud-pedestal{height:clamp(95px,17vh,185px);background:linear-gradient(#f6d2ab,#c87a39)}
+    .cloud-place.show .cloud-pedestal{transform:scaleY(1);transition:transform .75s cubic-bezier(.2,1.3,.4,1)}
+    .cloud-place.show .cloud-avatar{animation:cloud-drop .85s .2s both}
+    .cloud-place.show .cloud-pname,.cloud-place.show .cloud-pscore{opacity:1;transition:opacity .4s .8s}
+    .cloud-place-1.show .cloud-avatar{box-shadow:0 0 0 6px #f9d449,0 0 38px #f9d44988}
+    .cloud-place.celebrate .cloud-avatar{animation:cloud-jump 1.1s ease-in-out infinite}
+    .cloud-place.celebrate.cloud-place-2 .cloud-avatar{animation-delay:.22s}
+    .cloud-place.celebrate.cloud-place-3 .cloud-avatar{animation-delay:.38s}
+    .cloud-podium-rest{display:flex;flex-wrap:wrap;gap:8px 25px;justify-content:center;padding:0;margin:0 0 14px;list-style:none;font-size:clamp(12px,1.2vw,16px)}
+    .cloud-podium-rest li{background:#fff8;border:1px solid #dbe3f4;border-radius:12px;padding:8px 12px}
+    #game-podium-rest-heading{text-align:center;font-size:17px}
+    @keyframes cloud-drop{from{opacity:0;transform:translateY(-45vh) scale(.65)}to{opacity:1;transform:translateY(0) scale(1)}}
+    @keyframes cloud-jump{0%,100%{transform:translateY(0)}35%{transform:translateY(-18px)}}
+    canvas.confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:500}
+    @media(max-width:650px){.cloud-rrow{gap:6px;padding:7px 8px}.cloud-rpos{width:20px}.cloud-rmove{width:30px}.cloud-rgain{min-width:34px}.cloud-rscore{min-width:62px}.cloud-screen-title{margin:10px 0}.cloud-podium-stage{min-height:300px}}
+    @media(prefers-reduced-motion:reduce){.cloud-rrow.moving{transition:none}.cloud-place.show .cloud-pedestal{transition:none}.cloud-place.show .cloud-avatar,.cloud-place.celebrate .cloud-avatar{animation:none;opacity:1}.cloud-place.show .cloud-pname,.cloud-place.show .cloud-pscore{transition:none;opacity:1}}
+
+  </style>
+  <script src="/cloud-names.js" defer></script>
+  <script src="/cloud-effects.js" defer></script>
+  <script src="/cloud-presentation.js" defer></script>
+  <script src="/cloud-admin.js" defer></script>
+</head>
+<body>
+  <header><div class="brand" aria-label="Quizzz">
+    <span class="q">Qui</span><span class="z">zzz</span><span class="marks">!!!</span>
+  </div><span class="pill">PREVIEW · ADMINISTRACIÓN</span></header>
+  <main>
+    <div class="intro"><h1>Gestiona tus cuestionarios</h1>
+      <p>Acceso privado para formadores. Las partidas online y el editor todavía están en desarrollo.</p></div>
+    <section id="login-section" class="card" aria-labelledby="login-heading">
+      <h2 id="login-heading">Iniciar sesión</h2>
+      <p class="hint">Utiliza el usuario que ya has creado en Supabase Auth. No se admiten registros públicos.</p>
+      <form id="login-form" autocomplete="on">
+        <label for="email">Correo electrónico</label>
+        <input id="email" name="email" type="email" autocomplete="username" maxlength="254" required>
+        <label for="password">Contraseña</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button class="full" id="sign-in" type="submit">Entrar en Quizzz!</button>
+      </form>
+      <p id="login-status" class="status" role="status" aria-live="polite">Preparando el acceso…</p>
+    </section>
+    <section id="dashboard-section" hidden aria-labelledby="dash-heading">
+      <div class="toolbar"><div><h2 id="dash-heading">Tu espacio de trabajo</h2><p id="signed-user" class="hint"></p></div>
+        <button id="sign-out" type="button" class="minor">Cerrar sesión</button></div>
+      <div id="quiz-editor" class="card project-form" hidden>
+        <div class="actions"><h3 id="quiz-editor-heading" style="margin:0;flex:1">Nuevo cuestionario</h3><button class="minor" type="button" id="quiz-cancel">Cerrar editor</button></div>
+        <p class="hint">Guarda borradores aunque haya preguntas incompletas. Puedes añadir imágenes, vídeos cortos y YouTube. Las partidas estarán disponibles en próximas fases.</p>
+        <div class="actions"><button type="button" id="quiz-import" class="minor">Importar Excel / Word</button>
+          <button type="button" id="quiz-export-xlsx" class="minor">Exportar Excel</button>
+          <button type="button" id="quiz-export-docx" class="minor">Exportar Word</button></div>
+        <input id="quiz-import-file" type="file" accept=".xlsx,.docx" hidden>
+        <section id="quiz-import-preview" class="list-card" hidden aria-label="Vista previa de importación">
+          <h3>Vista previa de importación</h3>
+          <p id="quiz-import-summary" class="hint"></p>
+          <div id="quiz-import-warnings" class="hint"></div>
+          <div class="actions"><button type="button" id="quiz-import-append">Añadir preguntas</button>
+            <button type="button" id="quiz-import-replace" class="minor">Sustituir preguntas</button>
+            <button type="button" id="quiz-import-cancel" class="minor">Cancelar</button></div>
+        </section>
+        <form id="quiz-form">
+          <div class="fields">
+            <div><label for="quiz-title">Título del cuestionario</label><input id="quiz-title" maxlength="120" required></div>
+            <div><label for="quiz-project">Proyecto asociado</label><select id="quiz-project"><option value="">Sin proyecto</option></select></div>
+            <div><label for="quiz-description">Descripción</label><input id="quiz-description" maxlength="300"></div>
+            <div><label for="quiz-time">Tiempo predeterminado (segundos)</label><select id="quiz-time">
+              <option>5</option><option>10</option><option selected>20</option><option>30</option><option>45</option><option>60</option><option>90</option><option>120</option><option>240</option>
+            </select></div>
+          </div>
+          <div class="fields">
+            <label><input type="checkbox" id="quiz-device-text"> Mostrar pregunta en el dispositivo</label>
+            <label><input type="checkbox" id="quiz-late" checked> Permitir incorporaciones tardías</label>
+          </div>
+          <div class="actions" style="margin-top:20px"><h3 style="margin:0;flex:1">Preguntas</h3><button type="button" id="quiz-add-question" class="minor">+ Añadir pregunta</button></div>
+          <div id="quiz-question-list" class="items"></div>
+          <div id="quiz-question-editor" hidden>
+            <div class="fields">
+              <div><label for="question-type">Tipo</label><select id="question-type"><option value="quiz">Quiz</option><option value="truefalse">Verdadero / Falso</option><option value="poll">Encuesta</option></select></div>
+              <div><label for="question-time">Tiempo (segundos)</label><select id="question-time"><option>5</option><option>10</option><option>20</option><option>30</option><option>45</option><option>60</option><option>90</option><option>120</option><option>240</option></select></div>
+            </div>
+            <label for="question-text">Enunciado</label><textarea id="question-text" maxlength="250" rows="3"></textarea>
+            <section id="question-media" class="media-editor" aria-label="Multimedia de la pregunta">
+              <p><strong>Multimedia</strong> <span class="hint">(opcional)</span></p>
+              <div class="actions">
+                <button type="button" id="question-media-upload" class="minor">Subir imagen o vídeo</button>
+                <button type="button" id="question-media-youtube" class="minor">Añadir YouTube</button>
+                <button type="button" id="question-media-remove" class="minor" hidden>Quitar multimedia</button>
+              </div>
+              <input id="question-media-file" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.mp4,.webm" hidden>
+              <div id="question-media-youtube-form" class="actions" hidden>
+                <label for="question-media-youtube-url">Enlace seguro de YouTube</label>
+                <input type="url" id="question-media-youtube-url" placeholder="https://www.youtube.com/watch?v=..." maxlength="400">
+                <button type="button" id="question-media-youtube-save">Añadir enlace</button>
+              </div>
+              <div id="question-media-preview" class="media-preview" aria-live="polite"></div>
+              <dialog id="media-lightbox" aria-label="Imagen ampliada"><div class="lightbox-top"><button type="button" class="minor" id="media-lightbox-close">Cerrar imagen</button></div><img id="media-lightbox-image" alt="Imagen ampliada de la pregunta"></dialog>
+              <p id="question-media-status" class="hint" role="status" aria-live="polite">PNG, JPG, WEBP, GIF, MP4 o WEBM (máx. 6 MB). Sin SVG.</p>
+            </section>
+            <div id="question-options" class="question-options"></div>
+            <div class="fields">
+              <div><label for="question-points">Puntuación</label><select id="question-points"><option value="0">Sin puntos</option><option value="1">Estándar</option><option value="2">Doble</option></select></div>
+              <div><label for="question-explanation">Explicación tras responder</label><textarea id="question-explanation" maxlength="400" rows="2"></textarea></div>
+            </div>
+            <div class="actions"><button type="button" class="minor" id="question-duplicate">Duplicar pregunta</button><button type="button" class="minor" id="question-remove">Eliminar pregunta</button></div>
+          </div>
+          <div class="actions" style="margin-top:20px"><button id="quiz-submit" type="submit">Guardar cuestionario</button><span id="quiz-dirty" class="hint" style="margin:0"></span></div>
+          <p id="quiz-status" class="status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+      <div id="project-editor" class="card project-form" hidden>
+        <h3 id="project-form-title">Nuevo proyecto</h3>
+        <p class="hint">Identidad visual de una formación. La marca de Quizzz! se configura por separado.</p>
+        <form id="project-form">
+          <div class="fields">
+            <div><label for="project-name">Nombre del proyecto</label><input id="project-name" maxlength="80" required></div>
+            <div><label for="project-title">Título mostrado</label><input id="project-title" maxlength="80" required></div>
+            <div><label for="project-org">Organización</label><input id="project-org" maxlength="80"></div>
+            <div><label for="project-primary">Color principal</label><input id="project-primary" type="color" value="#6989e6"></div>
+            <div><label for="project-accent">Color secundario</label><input id="project-accent" type="color" value="#efa6a4"></div>
+          </div>
+          <div class="buttons"><button id="project-submit" type="submit">Guardar proyecto</button>
+          <button id="project-cancel" type="button" class="minor">Cancelar</button></div>
+        </form>
+        <p id="project-status" class="status" role="status" aria-live="polite"></p>
+      </div>
+      <dialog id="room-qr-dialog" aria-labelledby="room-qr-heading">
+        <div class="actions"><h2 id="room-qr-heading" style="margin:0;flex:1">Entrar en Quizzz!</h2><button type="button" id="room-qr-close" class="minor">Cerrar</button></div>
+        <div class="room-qr-content"><img id="room-qr-image" width="340" height="340" alt="Código QR para entrar en la sala de Quizzz!">
+          <p id="room-qr-pin" class="room-qr-pin"></p>
+          <div class="room-qr-attendees" aria-live="polite" aria-label="Jugadores en la sala">
+            <strong id="room-qr-count">0 participantes conectados</strong>
+            <div id="room-qr-names" class="room-qr-names">Esperando jugadores…</div>
+          </div>
+          <p class="hint">Escanea el QR con la cámara del móvil. Se asignará un nombre divertido automáticamente.</p>
+          <p class="hint">Preview protegido: cada dispositivo necesita acceso autorizado a Vercel.</p>
+          <p id="room-qr-status" class="status" role="status" aria-live="polite"></p>
+        </div>
+      </dialog>
+      <dialog id="game-presentation-dialog" aria-label="Clasificación y podio de Quizzz!">
+        <div class="cloud-presentation-head">
+          <span class="cloud-presentation-logo">Quizzz<span>!!!</span></span>
+          <div class="actions" style="margin:0">
+            <button id="game-presentation-replay" type="button" class="minor">↻ Repetir</button>
+            <button id="game-presentation-close" type="button" class="minor">✕ Cerrar</button>
+          </div>
+        </div>
+        <section id="game-presentation-ranking" hidden aria-label="Clasificación animada">
+          <h2 id="game-ranking-title" class="cloud-screen-title">Clasificación</h2>
+          <p id="game-ranking-subtitle" class="cloud-screen-subtitle"></p>
+          <div id="game-ranking-board" class="cloud-ranking-board" role="list"></div>
+          <p id="game-ranking-extra" class="cloud-screen-subtitle"></p>
+        </section>
+        <section id="game-presentation-podium" hidden aria-label="Podio final">
+          <h2 id="game-podium-title" class="cloud-screen-title">Y el ganador es…</h2>
+          <div id="game-podium-stage" class="cloud-podium-stage"></div>
+          <h3 id="game-podium-rest-heading">Resto de participantes</h3>
+          <ol id="game-podium-rest" class="cloud-podium-rest" start="4"></ol>
+        </section>
+        <div class="cloud-presentation-footer">
+          <button id="game-presentation-next" type="button">Siguiente pregunta ▶</button>
+        </div>
+      </dialog>
+      <section id="game-host" class="list-card" hidden style="margin-bottom:24px" aria-label="Control de partida">
+        <div class="actions"><h3 style="margin:0;flex:1">Partida en curso</h3><button id="game-host-hide" type="button" class="minor">Ocultar</button></div>
+        <p id="game-host-subtitle" class="hint"></p>
+        <h3 id="game-host-question">Preparando pregunta…</h3>
+        <p id="game-host-timer" class="hint"></p>
+        <div id="game-host-options" class="items"></div>
+        <div class="actions" style="margin-top:20px">
+          <button id="game-host-ranking" type="button" class="minor" hidden>🏆 Clasificación animada</button>
+          <button id="game-host-podium" type="button" class="minor" hidden>🏆 Ver podio final</button>
+          <button id="game-host-next" type="button">Mostrar resultado / Siguiente pregunta</button>
+          <button id="game-host-refresh" type="button" class="minor">Actualizar</button>
+        </div>
+        <h3>Clasificación provisional</h3>
+        <ul id="game-host-scores" class="items"></ul>
+        <p id="game-host-status" class="status" aria-live="polite" role="status"></p>
+      </section>
+      <section id="rooms-section" class="list-card" aria-label="Salas de prueba del formador" style="margin-bottom:24px">
+        <div class="actions"><h3 style="margin:0;flex:1">Salas preparadas</h3><button id="refresh-rooms" type="button" class="minor">Actualizar salas</button></div>
+        <p class="hint">Las entradas por QR se actualizan automáticamente cada 3 segundos. Solo se muestran los apodos, nunca los datos de acceso.</p>
+        <ul id="room-list" class="items"><li>Preparando listado…</li></ul>
+        <p id="room-status" class="status" role="status" aria-live="polite"></p>
+      </section>
+      <div class="columns">
+        <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Proyectos</h3><button id="new-project" type="button">+ Nuevo proyecto</button></div><ul class="items" id="project-list"></ul></article>
+        <article class="list-card"><div class="actions"><h3 style="margin:0;flex:1">Cuestionarios</h3><button id="new-quiz" type="button">+ Nuevo cuestionario</button></div>
+          <div class="actions"><button type="button" id="quiz-template-xlsx" class="minor">Plantilla Excel</button>
+            <button type="button" id="quiz-template-docx" class="minor">Plantilla Word</button></div>
+          <ul class="items" id="quiz-list"></ul></article>
+      </div>
+      <p id="dashboard-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+    <p class="footer">Las salas son todavía privadas y solo permiten preparar y cerrar una sesión. La versión de prueba permite iniciar preguntas y recoger respuestas de opción única; no está lista para sesiones públicas. Versión de prueba: gestión de proyectos y borradores de cuestionarios. Por seguridad, la sesión se mantiene en memoria y se cierra al actualizar la página. El acceso a la aplicación sigue protegido por Vercel Authentication.</p>
+  </main>
+</body></html>
