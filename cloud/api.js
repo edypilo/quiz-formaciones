@@ -637,6 +637,60 @@ function makeRouter(fetcher = fetch) {
     }
   });
 
+
+  // El QR se genera en servidor con la biblioteca ya usada por la app local.
+  // No se aceptan destinos arbitrarios: únicamente el host de este despliegue.
+  router.post('/rooms/:id/qr', express.json({ limit: '2kb' }), async (req, res) => {
+    if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
+    const roomUrl = req.body?.url;
+    if (typeof roomUrl !== 'string' || roomUrl.length > 2048)
+      return res.status(400).json({ error: 'invalid_invite_url' });
+    let parsed;
+    try {
+      parsed = new URL(roomUrl);
+      const urlHost = parsed.host.toLowerCase();
+      const expected = req.get('host')?.toLowerCase() || '';
+      if (parsed.protocol !== 'https:' || !expected || urlHost !== expected ||
+          parsed.username || parsed.password || parsed.pathname !== '/join' ||
+          parsed.hash || parsed.searchParams.size !== 2 ||
+          !/^[0-9]{6}$/.test(parsed.searchParams.get('pin') || '') ||
+          !uuid.test(parsed.searchParams.get('invite') || ''))
+        return res.status(400).json({ error: 'invalid_invite_url' });
+    } catch {
+      return res.status(400).json({ error: 'invalid_invite_url' });
+    }
+    const { url, key, jwt, userId } = req.cloud;
+    const params = new URLSearchParams({
+      id: 'eq.' + req.params.id, owner_id: 'eq.' + userId,
+      pin: 'eq.' + parsed.searchParams.get('pin'),
+      join_secret: 'eq.' + parsed.searchParams.get('invite'),
+      status: 'eq.waiting', is_joinable: 'eq.true',
+      expires_at: 'gt.' + new Date().toISOString(),
+      select: 'id', limit: '1',
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_rooms?' + params, {
+        headers: { apikey: key, Authorization: 'Bearer ' + jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const rooms = await readJson(response);
+      if (!response.ok || !Array.isArray(rooms))
+        return res.status(502).json({ error: 'room_query_failed' });
+      if (!rooms.length) return res.status(404).json({ error: 'room_not_found' });
+      const qr = await require('qrcode').toBuffer(parsed.href, {
+        type: 'png', width: 340, margin: 2,
+        color: { dark: '#17284d', light: '#ffffffff' },
+      });
+      res.set({
+        'Content-Type': 'image/png', 'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return res.status(200).send(qr);
+    } catch {
+      return res.status(502).json({ error: 'qr_unavailable' });
+    }
+  });
+
   router.post('/rooms/:id/close', async (req, res) => {
     if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
     const { url, userId } = req.cloud;
