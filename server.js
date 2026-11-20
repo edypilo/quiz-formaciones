@@ -62,6 +62,7 @@ if (IS_CLOUD) {
   app.get('/cloud-admin.js', sendCloudFile('admin.js', 'js'));
   app.get('/join', sendCloudFile('join.html', 'html'));
   app.get('/join.js', sendCloudFile('join.js', 'js'));
+  app.get('/cloud-names.js', sendCloudFile('names.js', 'js'));
   // API cloud protegida. El resto de la app permanece deshabilitada hasta migrar salas y editor.
   app.use('/api/cloud', require('./cloud/api').makeRouter());
   io.use((_socket, next) => next(new Error('cloud_setup_required')));
