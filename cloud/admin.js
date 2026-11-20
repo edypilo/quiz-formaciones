@@ -527,7 +527,14 @@
   $('game-host-refresh').addEventListener('click', () => void refreshHostGame());
   $('game-host-next').addEventListener('click', () => {
     const room = activeRooms.find(item => item.id === gameHostRoomId);
-    if (room) void hostGameAction(room, 'advance');
+    if (!room) return;
+    const context = presenterScores.get(room.id);
+    if (context?.phase === 'reveal') {
+      presenter.openRanking(room.id, context.scores,
+        presenterBaselines.get(room.id) || context.scores, context.index, context.count);
+      return;
+    }
+    if (context?.phase === 'question') void hostGameAction(room, 'advance');
   });
   async function hostGameAction(room, action) {
     if (!(await refreshAccess())) return;
@@ -587,7 +594,7 @@
       $('game-host-next').disabled = !['question','reveal'].includes(state.phase);
       $('game-host-next').textContent = state.phase === 'question'
         ? 'Mostrar resultado' : state.phase === 'reveal'
-          ? 'Siguiente pregunta / Finalizar' : 'Sin acciones disponibles';
+          ? 'Ver clasificación 🏆' : 'Sin acciones disponibles';
       $('game-host-question').textContent = state.question?.text || 'No hay pregunta activa.';
       $('game-host-timer').textContent = state.phase === 'question' && state.ends_at
         ? 'Tiempo restante: ' + Math.max(0, Math.ceil((Date.parse(state.ends_at) - Date.now()) / 1000)) + ' s'
