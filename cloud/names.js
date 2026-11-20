@@ -30,4 +30,9 @@ function generateName(used = new Set()) {
   return { name: `${animal} ${pick(ADJECTIVES)} ${used.size + 1}`, emoji };
 }
 
-window.QuizzzNames = Object.freeze({ generateName });
+function emojiForName(name) {
+  const animal = typeof name === 'string' ? name.split(' ')[0] : '';
+  const found = ANIMALS.find(([label]) => label === animal);
+  return found ? found[1] : '⭐';
+}
+window.QuizzzNames = Object.freeze({ generateName, emojiForName });
