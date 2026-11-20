@@ -23,6 +23,17 @@
   let qrObjectUrl = '';
   let animators = [];
   const identity = new Intl.Collator('es', { sensitivity: 'base' });
+  // Los broadcasts NO llevan datos privados: son solo avisos para recargar.
+  // El respaldo periódico continúa aun sin WebSocket.
+  const live = window.QuizzzHostRealtime?.createHostRealtime({
+    roomId,
+    onChange: () => void refresh(),
+    onStatus: (mode) => {
+      $('connection-mode').textContent = mode === 'live' ? '● En directo'
+        : mode === 'connecting' ? '◌ Conectando…' : '◌ Sincronización de respaldo';
+    },
+  });
+  if (uuid.test(roomId)) live?.start();
 
   function authorize() {
     if (!window.opener || window.opener.closed) {
@@ -40,6 +51,7 @@
         msg.roomId === roomId && msg.nonce === nonce &&
         typeof msg.token === 'string' && msg.token.length) {
       token = msg.token;
+      live?.setToken(token);
       void refresh();
     }
   });
@@ -99,7 +111,10 @@
   $('replay').addEventListener('click', () => {
     if (lastState?.phase === 'finished') renderPodium(lastState);
   });
-  window.addEventListener('beforeunload', () => { if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl); });
+  window.addEventListener('beforeunload', () => {
+    live?.stop();
+    if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
+  });
 
   async function loadQr(s) {
     if (!s.is_joinable || !s.join_secret || qrUrl) return;
@@ -305,6 +320,11 @@
       status('Conexión interrumpida: '+String(e.message)+'. Reintentando…',true);
     } finally {busy=false;}
   }
-  setInterval(()=>{if(!document.hidden)void refresh();},1000);
-  setInterval(()=>{if(!token)authorize();},4000);
+  // Respaldo si Realtime falla; durante la sesión confirma el estado cada 5 s.
+  setInterval(() => { if (!document.hidden) void refresh(); }, 5000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) void refresh();
+  });
+  // El panel renueva el JWT y el canal lo recibe mediante access_token.
+  setInterval(() => authorize(), 45000);
 })();
