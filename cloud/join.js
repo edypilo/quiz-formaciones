@@ -242,6 +242,27 @@
     }
   }
 
+  function renderYoutubeLink(media) {
+    const container = $('guest-media');
+    container.replaceChildren();
+    container.hidden = true;
+    if (media?.type !== 'youtube' || typeof media.src !== 'string') return;
+    try {
+      const u = new URL(media.src);
+      if (u.protocol !== 'https:' || u.hostname !== 'www.youtube.com' ||
+          u.pathname !== '/watch' || u.username || u.password || u.port) return;
+      const id = u.searchParams.get('v');
+      if (!/^[A-Za-z0-9_-]{11}$/.test(id || '')) return;
+      const link = document.createElement('a');
+      link.href = 'https://www.youtube.com/watch?v=' + id;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = '▶ Ver vídeo de esta pregunta en YouTube';
+      container.append(link);
+      container.hidden = false;
+    } catch {}
+  }
+
   function renderGame(state) {
     const phase = state.game_phase || 'lobby';
     const question = state.question;
@@ -267,6 +288,7 @@
       ? '¡Elige una respuesta!' : 'Resultado de la pregunta';
     $('guest-question-step').textContent = 'Pregunta ' + (question.index + 1) + ' de ' + question.count;
     $('guest-question-text').textContent = question.text;
+    renderYoutubeLink(question.media);
     const key = question.index + ':' + phase;
     const fresh = currentQuestionKey !== key;
     if (fresh) {
@@ -276,6 +298,7 @@
     }
     const revealing = phase === 'reveal';
     $('guest-question-text').hidden = revealing;
+    $('guest-media').hidden = revealing || !$('guest-media').hasChildNodes();
     $('guest-question-time').hidden = revealing;
     $('guest-question-options').hidden = revealing;
     $('guest-question-message').hidden = revealing;
