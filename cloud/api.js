@@ -209,8 +209,12 @@ function makeRouter(fetcher = fetch) {
       let url;
       try { url = new URL(location, config.url); } catch { return res.status(502).json({ error: 'invalid_signed_url' }); }
       const prefix = '/storage/v1/object/sign/quiz-media/' + allowed.path;
-      if (url.origin !== config.url || url.pathname !== prefix || !url.searchParams.has('token'))
+      if (url.origin !== config.url ||
+          ![prefix, prefix.replace(/^\/storage\/v1/, '')].includes(url.pathname) ||
+          !url.searchParams.has('token'))
         return res.status(502).json({ error: 'invalid_signed_url' });
+      // El SDK de Storage puede devolver rutas relativas a /storage/v1.
+      if (url.pathname !== prefix) url.pathname = prefix;
       return res.json({ ok: true, type: allowed.type, url: url.href, expiresIn: 30,
         index: allowed.index });
     } catch {
