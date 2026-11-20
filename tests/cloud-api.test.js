@@ -731,3 +731,59 @@ test('listado agrupado de participantes exige JWT, filtra propietario y limita s
     });
   }
 });
+
+test('invitado multimedia: firma temporal solo tras validar token, ruta y fase por RPC', async () => {
+  const envKeys=['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY'];
+  const old=envKeys.map(k=>process.env[k]);
+  const token='5c2a2c33-d1ba-442c-a28d-72f92e05a5df';
+  const path=USER+'/assets/ac16f472-f345-469e-8f24-5d978073a79b.png';
+  process.env.SUPABASE_URL='https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY='sb_publishable_test';
+  process.env.SUPABASE_SERVICE_ROLE_KEY='service_secret_test';
+  delete process.env.SUPABASE_ANON_KEY;
+  const calls=[];
+  const signedUrl='/object/sign/quiz-media/'+path+'?token=short-lived-token';
+  let result={ok:true,owner_id:USER,type:'image',path,index:0};
+  const fake=async(url,opts)=>{
+    calls.push({url:String(url),options:opts});
+    if(String(url).endsWith('/rpc/quiz_guest_active_media'))return mock(result);
+    if(String(url).includes('/storage/v1/object/sign/'))return mock({signedURL:signedUrl});
+    throw Error('Unexpected URL');
+  };
+  try {
+    await withApi(fake,{},async(base)=>{
+      const endpoint=base+'/api/cloud/guest/media';
+      const post=(payload)=>fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)});
+      assert.equal((await post({token:'invalid'})).status,400);
+      assert.equal(calls.length,0);
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      assert.equal((await post({token})).status,503);
+      process.env.SUPABASE_SERVICE_ROLE_KEY='service_secret_test';
+      assert.equal(calls.length,0);
+      const ok=await post({token});
+      assert.equal(ok.status,200);
+      const body=await ok.json();
+      assert.equal(body.ok,true);
+      assert.equal(body.index,0);
+      assert.equal(body.expiresIn,30);
+      assert.equal(body.url,'https://example.supabase.co/storage/v1'+signedUrl);
+      assert.equal(calls.length,2);
+      assert.equal(calls[0].options.headers.apikey,'sb_publishable_test');
+      assert.equal(calls[0].options.headers.Authorization,undefined);
+      assert.equal(calls[1].options.headers.apikey,'service_secret_test');
+      assert.equal(calls[1].options.headers.Authorization,'Bearer service_secret_test');
+      assert.equal(JSON.parse(calls[1].options.body).expiresIn,30);
+      result={ok:false,error:'question_not_active'};
+      assert.equal((await post({token})).status,403);
+      assert.equal(calls.length,3);
+      result={ok:true,owner_id:USER,type:'image',path:'different-owner/assets/ac16f472-f345-469e-8f24-5d978073a79b.png',index:0};
+      assert.equal((await post({token})).status,403);
+      assert.equal(calls.length,4);
+      assert.equal((await post({token,src:path})).status,400);
+      assert.equal(calls.length,4);
+    });
+  } finally {
+    envKeys.forEach((key,i)=>{if(old[i]===undefined)delete process.env[key];else process.env[key]=old[i];});
+  }
+});
