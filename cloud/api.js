@@ -158,6 +158,66 @@ function makeRouter(fetcher = fetch) {
     return res.json({ supabaseUrl: config.url, publishableKey: config.key });
   });
 
+  // Acceso temporal para invitados: solo al recurso de la pregunta activa.
+  // Requiere SUPABASE_SERVICE_ROLE_KEY exclusivamente en el servidor.
+  // Las peticiones fallan cerradas si no está configurada.
+  router.post('/guest/media', express.json({ limit: '2kb' }), async (req, res) => {
+    const token = req.body?.token;
+    if (typeof token !== 'string' || !uuid.test(token) ||
+        Object.keys(req.body || {}).some(k => k !== 'token')) {
+      return res.status(400).json({ error: 'invalid_guest_token' });
+    }
+    const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (typeof secret !== 'string' || !secret) {
+      return res.status(503).json({ error: 'guest_media_not_configured' });
+    }
+    const config = configuration();
+    if (!config) return res.status(503).json({ error: 'supabase_not_configured' });
+    try {
+      const authorization = await fetcher(config.url + '/rest/v1/rpc/quiz_guest_active_media', {
+        method: 'POST',
+        headers: {
+          apikey: config.key,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_token: token }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const allowed = await readJson(authorization);
+      if (!authorization.ok || allowed?.ok !== true ||
+          !uuid.test(allowed.owner_id || '') ||
+          !['image','video'].includes(allowed.type) ||
+          normalizeCloudMedia({ type: allowed.type, src: allowed.path }, allowed.owner_id) === undefined) {
+        return res.status(403).json({ error: 'media_not_available_for_guest' });
+      }
+      const signed = await fetcher(config.url + '/storage/v1/object/sign/quiz-media/' +
+          allowed.path, {
+        method: 'POST',
+        headers: {
+          apikey: secret,
+          Authorization: 'Bearer ' + secret,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ expiresIn: 30 }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const signedData = await readJson(signed);
+      const location = signedData?.signedURL || signedData?.signedUrl;
+      if (!signed.ok || typeof location !== 'string' || location.length > 2000)
+        return res.status(502).json({ error: 'media_signing_unavailable' });
+      // Verificar que la URL firmada no apunta fuera del bucket solicitado.
+      let url;
+      try { url = new URL(location, config.url); } catch { return res.status(502).json({ error: 'invalid_signed_url' }); }
+      const prefix = '/storage/v1/object/sign/quiz-media/' + allowed.path;
+      if (url.origin !== config.url || url.pathname !== prefix || !url.searchParams.has('token'))
+        return res.status(502).json({ error: 'invalid_signed_url' });
+      return res.json({ ok: true, type: allowed.type, url: url.href, expiresIn: 30,
+        index: allowed.index });
+    } catch {
+      return res.status(502).json({ error: 'guest_media_unavailable' });
+    }
+  });
+
   router.use(async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     const config = configuration();
