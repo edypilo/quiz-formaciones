@@ -198,7 +198,7 @@ function makeRouter(fetcher = fetch) {
           Authorization: 'Bearer ' + secret,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ expiresIn: 30 }),
+        body: JSON.stringify({ expiresIn: 300 }),
         signal: AbortSignal.timeout(8000),
       });
       const signedData = await readJson(signed);
@@ -215,7 +215,7 @@ function makeRouter(fetcher = fetch) {
         return res.status(502).json({ error: 'invalid_signed_url' });
       // El SDK de Storage puede devolver rutas relativas a /storage/v1.
       if (url.pathname !== prefix) url.pathname = prefix;
-      return res.json({ ok: true, type: allowed.type, url: url.href, expiresIn: 30,
+      return res.json({ ok: true, type: allowed.type, url: url.href, expiresIn: 300,
         index: allowed.index });
     } catch {
       return res.status(502).json({ error: 'guest_media_unavailable' });
