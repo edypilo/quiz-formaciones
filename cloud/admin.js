@@ -167,6 +167,8 @@
     roomPlayerCounts = new Map();
     selectedQrRoomId = '';
     hideRoomQr();
+    gameHostRoomId = '';
+    $('game-host').hidden = true;
     roomMessage('');
     projectsCache = [];
     ownerId = '';
@@ -297,7 +299,19 @@
           players.type = 'button'; players.className = 'minor';
           players.textContent = 'Ver participantes';
           players.addEventListener('click', () => void viewPlayers(room));
-          controls.append(invite, players);
+          const launch = document.createElement('button');
+          launch.type = 'button'; launch.className = 'minor';
+          launch.textContent = 'Iniciar partida';
+          launch.addEventListener('click', () => void hostGameAction(room, 'start'));
+          const viewGame = document.createElement('button');
+          viewGame.type = 'button'; viewGame.className = 'minor';
+          viewGame.textContent = 'Ver partida';
+          viewGame.addEventListener('click', () => {
+            gameHostRoomId = room.id;
+            $('game-host').hidden = false;
+            void refreshHostGame();
+          });
+          controls.append(invite, players, launch, viewGame);
         }
         const close = document.createElement('button');
         close.type = 'button'; close.className = 'minor'; close.textContent = 'Cerrar sala';
@@ -473,6 +487,96 @@
       message($('room-qr-status'), 'No se pudo generar el QR. Prueba a copiar la invitación.', 'error');
     }
   }
+
+
+  let gameHostRoomId = '';
+  let gameHostBusy = false;
+  $('game-host-hide').addEventListener('click', () => {
+    gameHostRoomId = '';
+    $('game-host').hidden = true;
+  });
+  $('game-host-refresh').addEventListener('click', () => void refreshHostGame());
+  $('game-host-next').addEventListener('click', () => {
+    const room = activeRooms.find(item => item.id === gameHostRoomId);
+    if (room) void hostGameAction(room, 'advance');
+  });
+  async function hostGameAction(room, action) {
+    if (!(await refreshAccess())) return;
+    const url = '/api/cloud/rooms/' + encodeURIComponent(room.id) + '/' + action;
+    try {
+      const response = await fetch(url, {
+        method: 'POST', headers: { Authorization: 'Bearer ' + accessToken }, cache: 'no-store',
+      });
+      const data = await json(response);
+      if (!response.ok || !data?.ok) {
+        const errors = { no_players: 'Debes tener al menos un participante.',
+          invalid_questions: 'El cuestionario necesita preguntas completas de respuesta única.',
+          room_not_ready: 'La sala ya está jugando o todavía no está habilitada.',
+          invalid_phase: 'Esta acción no está disponible en la fase actual.' };
+        roomMessage(errors[data?.error] || 'No se pudo cambiar el estado de la partida.', 'error');
+        return;
+      }
+      gameHostRoomId = room.id;
+      $('game-host').hidden = false;
+      await refreshHostGame();
+    } catch {
+      roomMessage('No se ha podido comunicar con el motor de juego.', 'error');
+    }
+  }
+  async function refreshHostGame() {
+    if (!gameHostRoomId || gameHostBusy || dashboard.hidden) return;
+    gameHostBusy = true;
+    const id = gameHostRoomId;
+    try {
+      if (!(await refreshAccess())) return;
+      const headers = { Authorization: 'Bearer ' + accessToken };
+      const [stateResponse, scoresResponse] = await Promise.all([
+        fetch('/api/cloud/rooms/' + encodeURIComponent(id) + '/game', { headers, cache: 'no-store' }),
+        fetch('/api/cloud/rooms/' + encodeURIComponent(id) + '/scores', { method: 'POST', headers, cache: 'no-store' }),
+      ]);
+      if (!stateResponse.ok || !scoresResponse.ok) throw new Error('game_data');
+      const state = await json(stateResponse);
+      const ranking = await json(scoresResponse);
+      if (gameHostRoomId !== id || !ranking?.ok) return;
+      $('game-host-subtitle').textContent = 'Fase: ' + ({
+        lobby: 'Sala de espera', question: 'Respondiendo',
+        reveal: 'Resultado de la pregunta', finished: 'Partida terminada',
+      }[state.phase] || state.phase) + (state.index >= 0
+        ? ' · Pregunta ' + (state.index + 1) + ' de ' + state.count : '');
+      $('game-host-next').disabled = !['question','reveal'].includes(state.phase);
+      $('game-host-next').textContent = state.phase === 'question'
+        ? 'Mostrar resultado' : state.phase === 'reveal'
+          ? 'Siguiente pregunta / Finalizar' : 'Sin acciones disponibles';
+      $('game-host-question').textContent = state.question?.text || 'No hay pregunta activa.';
+      $('game-host-timer').textContent = state.phase === 'question' && state.ends_at
+        ? 'Tiempo restante: ' + Math.max(0, Math.ceil((Date.parse(state.ends_at) - Date.now()) / 1000)) + ' s'
+        : '';
+      const options = $('game-host-options');
+      options.replaceChildren();
+      (state.question?.options || []).forEach((value, i) => {
+        if (!value) return;
+        const el = document.createElement('div');
+        el.className = 'game-choice' +
+          (state.question.correct?.includes(i) ? ' game-correct' : '');
+        el.textContent = (i + 1) + '. ' + value;
+        options.append(el);
+      });
+      const scores = $('game-host-scores');
+      scores.replaceChildren();
+      (ranking.scores || []).forEach((player, i) => {
+        const li = document.createElement('li');
+        li.textContent = (i + 1) + '. ' + player.nickname + ' · ' + player.score +
+          ' puntos · ' + player.answered + ' respuestas';
+        scores.append(li);
+      });
+      message($('game-host-status'), 'Datos actualizados.', 'success');
+    } catch {
+      message($('game-host-status'), 'No se pudo consultar la partida. Comprueba la migración SQL.', 'error');
+    } finally { gameHostBusy = false; }
+  }
+  window.setInterval(() => {
+    if (gameHostRoomId && !document.hidden && !dashboard.hidden) void refreshHostGame();
+  }, 2000);
 
   async function openRoom(room) {
     if (!window.confirm('¿Habilitar la entrada de invitados a esta sala? Sigue siendo una prueba protegida por Vercel.')) return;
