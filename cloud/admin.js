@@ -24,6 +24,13 @@
   let mediaPreviewUrl = '';
   let mediaPreviewVersion = 0;
   let mediaUploading = false;
+  let activeRooms = [];
+  let roomPlayerCounts = new Map();
+  let playerRefreshBusy = false;
+  let playerPolling = null;
+  let selectedQrRoomId = '';
+  const pollingMs = 5000;
+
   const allowedMedia = Object.freeze({
     'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif',
     'video/mp4': 'mp4', 'video/webm': 'webm',
@@ -154,6 +161,12 @@
     $('project-list').replaceChildren();
     $('quiz-list').replaceChildren();
     $('room-list').replaceChildren();
+    if (playerPolling) window.clearInterval(playerPolling);
+    playerPolling = null;
+    activeRooms = [];
+    roomPlayerCounts = new Map();
+    selectedQrRoomId = '';
+    hideRoomQr();
     roomMessage('');
     projectsCache = [];
     ownerId = '';
@@ -247,6 +260,10 @@
         pin.textContent = 'PIN de prueba: ' + room.pin + ' · Caduca: ' +
           new Date(room.expires_at).toLocaleString('es-ES');
         detail.append(name, pin);
+        const people = document.createElement('div');
+        people.className = 'room-participants';
+        people.id = 'room-participants-' + room.id;
+        detail.append(people);
         const controls = document.createElement('div');
         controls.className = 'actions';
         controls.style.margin = '0';
@@ -289,11 +306,95 @@
         li.append(detail, controls);
         list.append(li);
       }
+      activeRooms = rooms;
+      renderParticipantLists();
+      if (!playerPolling) playerPolling = window.setInterval(() => {
+        if (!document.hidden && !dashboard.hidden) void updatePlayers();
+      }, pollingMs);
+      await updatePlayers();
       roomMessage('Listado de salas actualizado.', 'success');
     } catch {
       roomMessage('No se pudieron consultar las salas.', 'error');
     }
   }
+
+  function renderParticipantLists() {
+    for (const room of activeRooms) {
+      const target = $('room-participants-' + room.id);
+      if (!target) continue;
+      const players = roomPlayerCounts.get(room.id) || [];
+      target.replaceChildren();
+      const header = document.createElement('strong');
+      header.textContent = players.length + (players.length === 1 ? ' participante' : ' participantes');
+      target.append(header);
+      const list = document.createElement('ul');
+      if (!players.length) {
+        const li = document.createElement('li');
+        li.textContent = 'Esperando jugadores…';
+        list.append(li);
+      } else {
+        players.forEach((player) => {
+          const li = document.createElement('li');
+          li.textContent = player.nickname;
+          list.append(li);
+        });
+      }
+      target.append(list);
+    }
+    if (selectedQrRoomId && $('room-qr-dialog').open) {
+      const players = roomPlayerCounts.get(selectedQrRoomId) || [];
+      $('room-qr-count').textContent = players.length +
+        (players.length === 1 ? ' participante conectado' : ' participantes conectados');
+      const names = $('room-qr-names');
+      names.replaceChildren();
+      if (!players.length) names.textContent = 'Esperando jugadores…';
+      else players.forEach((player) => {
+        const span = document.createElement('span');
+        span.textContent = player.nickname;
+        names.append(span);
+      });
+    }
+  }
+  async function updatePlayers() {
+    if (playerRefreshBusy || dashboard.hidden || !accessToken) return;
+    if (!activeRooms.length) {
+      roomPlayerCounts.clear();
+      renderParticipantLists();
+      return;
+    }
+    playerRefreshBusy = true;
+    const ids = activeRooms.filter(room => room.is_joinable).slice(0, 6).map(room => room.id);
+    if (!ids.length) {
+      roomPlayerCounts.clear();
+      renderParticipantLists();
+      playerRefreshBusy = false;
+      return;
+    }
+    try {
+      if (!(await refreshAccess())) return;
+      const response = await fetch('/api/cloud/rooms/players?ids=' +
+        encodeURIComponent(ids.join(',')), {
+        headers: { Authorization: 'Bearer ' + accessToken },
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('player_refresh_failed');
+      const records = await json(response);
+      if (!Array.isArray(records)) throw new Error('invalid_player_response');
+      const next = new Map();
+      ids.forEach(id => next.set(id, []));
+      for (const player of records) {
+        if (next.has(player.room_id)) next.get(player.room_id).push(player);
+      }
+      roomPlayerCounts = next;
+      renderParticipantLists();
+    } catch {
+      if ($('room-qr-dialog').open)
+        message($('room-qr-status'), 'La lista de jugadores no se pudo actualizar. Se volverá a intentar.', 'error');
+    } finally {
+      playerRefreshBusy = false;
+    }
+  }
+
   $('refresh-rooms').addEventListener('click', () => void refreshRooms());
 
   async function createRoom(quiz) {
@@ -335,6 +436,7 @@
     $('room-qr-image').removeAttribute('src');
     if (roomQrObjectUrl) URL.revokeObjectURL(roomQrObjectUrl);
     roomQrObjectUrl = '';
+    selectedQrRoomId = '';
   }
   $('room-qr-close').addEventListener('click', hideRoomQr);
   $('room-qr-dialog').addEventListener('close', hideRoomQr);
@@ -345,7 +447,9 @@
       return;
     }
     hideRoomQr();
+    selectedQrRoomId = room.id;
     $('room-qr-pin').textContent = room.pin;
+    renderParticipantLists();
     message($('room-qr-status'), 'Generando QR seguro…');
     $('room-qr-dialog').showModal();
     try {
@@ -364,6 +468,7 @@
       roomQrObjectUrl = URL.createObjectURL(blob);
       $('room-qr-image').src = roomQrObjectUrl;
       message($('room-qr-status'), 'QR preparado. Comprueba que los móviles tienen acceso a Vercel Preview.', 'success');
+      await updatePlayers();
     } catch {
       message($('room-qr-status'), 'No se pudo generar el QR. Prueba a copiar la invitación.', 'error');
     }
