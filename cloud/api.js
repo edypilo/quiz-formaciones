@@ -617,6 +617,36 @@ function makeRouter(fetcher = fetch) {
     }
   });
 
+  // Una consulta por lote evita una solicitud por cada sala en el navegador.
+  // Hasta seis salas activas por comprobación, solo apodos de sus propietarios.
+  router.get('/rooms/players', async (req, res) => {
+    const raw = String(req.query.ids || '');
+    const ids = raw.split(',').filter(Boolean);
+    if (!ids.length || ids.length > 6 || new Set(ids).size !== ids.length ||
+        ids.some((id) => !uuid.test(id)))
+      return res.status(400).json({ error: 'invalid_room_ids' });
+    const { url, key, jwt, userId } = req.cloud;
+    const params = new URLSearchParams({
+      room_id: 'in.(' + ids.join(',') + ')',
+      owner_id: 'eq.' + userId,
+      select: 'id,room_id,nickname,joined_at',
+      order: 'joined_at.asc',
+      limit: '360',
+    });
+    try {
+      const response = await fetcher(url + '/rest/v1/quiz_room_players?' + params, {
+        headers: { apikey: key, Authorization: 'Bearer ' + jwt },
+        signal: AbortSignal.timeout(8000),
+      });
+      const rows = await readJson(response);
+      if (!response.ok || !Array.isArray(rows))
+        return res.status(502).json({ error: 'player_query_failed' });
+      return res.json(rows);
+    } catch {
+      return res.status(502).json({ error: 'player_query_failed' });
+    }
+  });
+
   router.get('/rooms/:id/players', async (req, res) => {
     if (!uuid.test(req.params.id)) return res.status(400).json({ error: 'invalid_room_id' });
     const { url, key, jwt, userId } = req.cloud;
