@@ -773,6 +773,7 @@ function makeRouter(fetcher = fetch) {
         count: Array.isArray(r.game_questions) ? r.game_questions.length : 0,
         ends_at: r.question_ends_at,
         question: q ? { text: q.text, type: q.type, options: q.options,
+                        media: normalizeCloudMedia(q.media, userId) || null,
                         correct: r.game_phase === 'reveal' ? q.correct : null } : null,
       });
     } catch {
