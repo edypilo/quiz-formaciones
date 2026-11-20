@@ -491,7 +491,32 @@
 
   let gameHostRoomId = '';
   let gameHostBusy = false;
+  const presenterBaselines = new Map();
+  const presenterPhases = new Map();
+  const presenterScores = new Map();
+  const presenter = window.QuizzzPresentation.createPresenter({
+    advance: async (roomId) => {
+      const room = activeRooms.find((item) => item.id === roomId);
+      if (!room) return;
+      presenter.close();
+      await hostGameAction(room, 'advance');
+    },
+  });
+  $('game-host-ranking').addEventListener('click', () => {
+    const roomId = gameHostRoomId;
+    if (!roomId) return;
+    const context = presenterScores.get(roomId);
+    if (!context || context.phase !== 'reveal') return;
+    presenter.openRanking(roomId, context.scores, presenterBaselines.get(roomId) || context.scores,
+      context.index, context.count);
+  });
+  $('game-host-podium').addEventListener('click', () => {
+    const roomId = gameHostRoomId;
+    const context = presenterScores.get(roomId);
+    if (roomId && context?.phase === 'finished') presenter.openPodium(roomId, context.scores);
+  });
   $('game-host-hide').addEventListener('click', () => {
+    presenter.close();
     gameHostRoomId = '';
     $('game-host').hidden = true;
   });
@@ -538,6 +563,18 @@
       const state = await json(stateResponse);
       const ranking = await json(scoresResponse);
       if (gameHostRoomId !== id || !ranking?.ok) return;
+      const current = window.QuizzzPresentation.normalizeScores(ranking.scores);
+      const phaseKey = String(state.index) + ':' + state.phase;
+      const oldPhaseKey = presenterPhases.get(id);
+      if (oldPhaseKey !== phaseKey) {
+        if (state.phase === 'question') presenterBaselines.set(id, current.map(p => ({ ...p })));
+        presenterPhases.set(id, phaseKey);
+      }
+      presenterScores.set(id, { scores: current, phase: state.phase, index: state.index, count: state.count });
+      $('game-host-ranking').hidden = state.phase !== 'reveal';
+      $('game-host-podium').hidden = state.phase !== 'finished';
+      if (state.phase === 'finished' && oldPhaseKey !== phaseKey && !presenter.isOpen())
+        presenter.openPodium(id, current);
       $('game-host-subtitle').textContent = 'Fase: ' + ({
         lobby: 'Sala de espera', question: 'Respondiendo',
         reveal: 'Resultado de la pregunta', finished: 'Partida terminada',
