@@ -260,6 +260,11 @@
           const url = new URL('/join', window.location.origin);
           url.searchParams.set('pin', room.pin);
           url.searchParams.set('invite', room.join_secret);
+          const showQr = document.createElement('button');
+          showQr.type = 'button'; showQr.className = 'minor';
+          showQr.textContent = 'Mostrar QR';
+          showQr.addEventListener('click', () => void showRoomQr(room, url.href));
+          controls.append(showQr);
           const invite = document.createElement('button');
           invite.type = 'button'; invite.className = 'minor';
           invite.textContent = 'Copiar invitación';
@@ -319,6 +324,48 @@
         '. Es solo una prueba privada; los jugadores todavía no pueden entrar.', 'success');
     } catch {
       roomMessage('Error de conexión al crear la sala.', 'error');
+    }
+  }
+
+
+  let roomQrObjectUrl = '';
+  function hideRoomQr() {
+    const dialog = $('room-qr-dialog');
+    if (dialog.open) dialog.close();
+    $('room-qr-image').removeAttribute('src');
+    if (roomQrObjectUrl) URL.revokeObjectURL(roomQrObjectUrl);
+    roomQrObjectUrl = '';
+  }
+  $('room-qr-close').addEventListener('click', hideRoomQr);
+  $('room-qr-dialog').addEventListener('close', hideRoomQr);
+  async function showRoomQr(room, joinUrl) {
+    if (!(await refreshAccess())) {
+      closeSession();
+      message(status, 'La sesión ha caducado.', 'error');
+      return;
+    }
+    hideRoomQr();
+    $('room-qr-pin').textContent = room.pin;
+    message($('room-qr-status'), 'Generando QR seguro…');
+    $('room-qr-dialog').showModal();
+    try {
+      const response = await fetch('/api/cloud/rooms/' + encodeURIComponent(room.id) + '/qr', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: joinUrl }),
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('qr_error');
+      const blob = await response.blob();
+      if (!$('room-qr-dialog').open) return;
+      roomQrObjectUrl = URL.createObjectURL(blob);
+      $('room-qr-image').src = roomQrObjectUrl;
+      message($('room-qr-status'), 'QR preparado. Comprueba que los móviles tienen acceso a Vercel Preview.', 'success');
+    } catch {
+      message($('room-qr-status'), 'No se pudo generar el QR. Prueba a copiar la invitación.', 'error');
     }
   }
 
