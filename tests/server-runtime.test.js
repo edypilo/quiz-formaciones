@@ -80,6 +80,15 @@ test('modo cloud: disponible el health-check pero bloqueadas las rutas privadas'
     assert.match(csp, /media-src 'self' blob:/);
     assert.doesNotMatch(csp, /img-src[^;]*https:\/\//);
     assert.doesNotMatch(csp, /media-src[^;]*https:\/\//);
+    const presenterPage = await fetch(`${base}/presenter?room=d5f47ca1-a416-43a3-8341-6dffca530f3f`);
+    assert.equal(presenterPage.status, 200);
+    const presenterHtml = await presenterPage.text();
+    assert.match(presenterHtml, /Escanea y participa/);
+    assert.match(presenterHtml, /id="responses"/);
+    assert.match(presenterHtml, /id="podium-screen"/);
+    const presenterJs = await fetch(`${base}/presenter.js`);
+    assert.equal(presenterJs.status, 200);
+    assert.match(await presenterJs.text(), /quizzz:presenter-auth-request/);
     const guestPage = await fetch(`${base}/join`);
     assert.equal(guestPage.status, 200);
     assert.match(await guestPage.text(), /Entra a jugar/);
